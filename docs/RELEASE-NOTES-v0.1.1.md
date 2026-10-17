@@ -1,26 +1,63 @@
-# AppArmorX 0.1.1 — security correctness patch
+# AppArmorX 0.1.1 — broader dependency protection, clearer security evidence
 
-## Fixed
+AppArmorX delivers Android runtime protection through one Gradle plugin. **0.1.1 extends the dependency firewall to supported calls inside external JAR/AAR libraries** and fixes cases where missing or malformed evidence could look clean or silently disable a setting.
 
-- Supported clipboard, identifier, location and TLS-setup call rewriting now also runs over external JAR/AAR bytecode. Version 0.1.0 used project-only instrumentation. Lifecycle guard injection remains scoped to application project components.
-- Malformed optional enforcement booleans are rejected instead of silently becoming false; absent legacy fields retain their defaults.
-- Failed/empty native wait-channel reads report UNAVAILABLE instead of CLEAR. SELinux status accepts valid 0/1 values and reports malformed data as UNAVAILABLE.
+[Get 0.1.1 on the Gradle Plugin Portal](https://plugins.gradle.org/plugin/com.apparmorx.security/0.1.1) · [Quickstart](https://github.com/dev-shushant/security-gradle/blob/main/QUICKSTART.md)
 
-## Verification and documentation
+## What you get with AppArmorX
 
-- Added an independent signed R8 consumer fixture, configuration-cache checks, native ABI/report checks and final-DEX verification of an external-JAR clipboard call.
-- Added dependency-boundary and policy regressions, native regression CI, and environment-aware device assertions for denied probe reads.
-- Corrected Play Integrity helper documentation and narrowed watchdog claims to recorded evidence.
-- Local validation: 171 unit tests, native regressions, plugin validation, Android lint, signed R8 consumer and 21/21 Android 17 arm64 emulator tests passed. Post-publication 0.1.1 verification also passed: public plugin resolution, signed R8 build, both native ABIs, reports, configuration-cache reuse and external-JAR clipboard rewriting.
+- **Build-integrated protection:** instrumentation, runtime packaging and initialization without adding application initialization code. Your source files stay unchanged.
+- **Runtime security evidence:** checks for root, debugging, hooking and tampering signals, with explicit `CLEAR`, `DETECTED` and `UNAVAILABLE` outcomes.
+- **A configurable dependency firewall:** supported clipboard, identifier, last-known-location and permissive TLS-setup calls are routed through your policy.
+- **Deployment controls and visibility:** DEVELOPMENT, STANDARD and HARDENED profiles, configurable responses, protection coverage reports, manifest findings and HTML/JSON/SARIF output.
 
-## Upgrade
+These are existing engine capabilities available in this release; the changes below are new in 0.1.1. Local protection needs no hosted account or mandatory telemetry. The engine is Apache-2.0 licensed.
+
+## What's new in 0.1.1
+
+### Protection reaches supported library call sites
+
+0.1.0 instrumented project bytecode only. **0.1.1 also rewrites supported calls in external JAR/AAR bytecode**, including:
+
+| Call category | Policy-controlled behavior |
+|---|---|
+| Clipboard reads | Neutralize supported primary-clip reads and availability checks |
+| Device identifiers | Sanitize supported Android ID, device-ID and IMEI access |
+| Last-known location | Return no location for supported calls when configured |
+| TLS setup | Reject supported permissive verifier/trust-manager configurations |
+
+Lifecycle guard injection remains scoped to application project components. The dependency pass does not add lifecycle overrides to library components.
+
+### Unknown evidence stays unknown
+
+- Failed or empty native wait-channel reads now return `UNAVAILABLE`, rather than `CLEAR`.
+- SELinux parsing accepts valid `0`/`1` values; malformed or missing data returns `UNAVAILABLE`.
+- Malformed optional security booleans now invalidate policy parsing instead of silently becoming `false`. Absent legacy fields retain their defaults.
+
+### Stronger release verification
+
+- An independent consumer downloads the published plugin, builds a signed R8 release, verifies both native ABIs and reports, and checks configuration-cache reuse.
+- Final DEX inspection confirms an external-JAR clipboard call routes through `DependencyFirewall`.
+- Local validation passed 171 unit tests, native regressions, plugin validation, Android lint and 21/21 Android 17 arm64 emulator tests.
+- Post-release CI passed build/candidate checks, the public consumer, and both API 29 and API 33 x86_64 emulator jobs. Emulator jobs are now required, and failures retain raw test results and logs. [Verified CI run](https://github.com/dev-shushant/security-gradle/actions/runs/39043122340).
+
+## Upgrade to 0.1.1
 
 ```kotlin
 plugins {
+    id("com.android.application")
     id("com.apparmorx.security") version "0.1.1"
 }
 ```
 
-If pluginManagement.repositories is customized, include gradlePluginPortal(). Rebuild the app and review the protection report; newly covered supported dependency calls can change clipboard/identifier/location/TLS behavior under your configured firewall policy.
+If your project customizes `pluginManagement.repositories`, include `gradlePluginPortal()` alongside its Android repositories. Rebuild and review the protection report.
 
-AppArmorX remains pre-1.0. Framework/AndroidX/runtime namespaces, unsupported APIs and injected code are outside this dependency instrumentation scope. No independent penetration assessment, universal OEM compatibility or parity with commercial RASP platforms is claimed. See [honest limits](https://github.com/dev-shushant/security-gradle/blob/main/docs/HONEST-LIMITS.md) and [qualification evidence](https://github.com/dev-shushant/security-gradle/blob/main/docs/RELEASE-QUALIFICATION-0.1.1.md).
+**Upgrade impact:** supported calls inside dependencies may now be governed by firewall settings that previously affected project code only. Exercise clipboard, identifier, location and networking flows before rollout. No new application initialization code is required.
+
+## Coverage and release status
+
+AppArmorX remains **pre-1.0**. Framework, AndroidX and AppArmorX runtime namespaces are excluded from the dependency pass. Unsupported APIs, reflection and dynamically injected calls outside rewritten bytecode are not covered by this firewall.
+
+The Play Integrity helper currently provides library-presence and transaction-hashing helpers, not token requests or server verification. Recorded watchdog results apply to the tested payload and timing; periodic checks cannot prevent every action already in flight.
+
+[Coverage and limits](https://github.com/dev-shushant/security-gradle/blob/main/docs/HONEST-LIMITS.md) · [Release qualification](https://github.com/dev-shushant/security-gradle/blob/main/docs/RELEASE-QUALIFICATION-0.1.1.md) · [Source](https://github.com/dev-shushant/security-gradle)
