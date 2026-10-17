@@ -80,6 +80,11 @@ State this table, not "works on all Android", in every public post.
 
 ## 0.1.1 patch publication
 
-Owner authorized publication on 17 October 2026. Exact-version validation and upload are being performed.
+Owner authorized publication on 17 October 2026. Exact-version validation and upload passed.
+Version 0.1.1 is live at https://plugins.gradle.org/plugin/com.apparmorx.security/0.1.1;
+the anonymous plugin marker returned HTTP 200. GitHub pre-release:
+https://github.com/dev-shushant/security-gradle/releases/tag/v0.1.1 (source d1dc310).
+Public Android consumer verification is running. Initial remote CI found Linux host-header and retired
+SDK setup-package issues; a CI portability follow-up addresses these without changing runtime behavior.
 Local evidence: 171 unit tests, native regressions, lint/plugin validation, isolated signed R8 consumer
 with dependency rewrite verification, and 21/21 final Android 17 arm64 emulator tests.

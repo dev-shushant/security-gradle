@@ -198,6 +198,8 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - name: Install consumer SDK
         run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
       - name: Verify public 0.1.1 installation, signed R8 build and cache reuse

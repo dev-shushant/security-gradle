@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <charconv>
 #include <cctype>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
