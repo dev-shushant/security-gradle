@@ -17,7 +17,7 @@ Every check AppArmorX runs, by engine. A probe that cannot run reports `UNAVAILA
 | `native-hook-trampoline` | Native | Inline-hook prologues on libc entry points (ARM64, x86_64) |
 | `native-selinux` | Native | SELinux enforcing state (reports `UNAVAILABLE`, not clean, if the device denies reading `/sys/fs/selinux/enforce` — confirmed happening on a real SELinux-enforcing device) |
 | `native-hardware-device` | Native | Emulator / virtualised hardware (same EACCES-vs-absent distinction as `root-path`) |
-| `native-wchan` | Native | `ptrace_stop` wait channel |
+| `native-wchan` | Native | `ptrace_stop`/`sys_ptrace`/`do_signal_stop` wait-channel indicators; missing/empty reads report `UNAVAILABLE` in 0.1.1 |
 | `native-frida-port` | Native | Default Frida listener ports (corroborating signal only; reports `UNAVAILABLE`, not clean, if `/proc/net/tcp[6]` is unreadable — confirmed happening on a real SELinux-enforcing device, see [STATUS.md](STATUS.md)) |
 | `native-memory-rwx` | Native | Suspicious RWX anonymous pages |
 | `native-stealth-injection` | Native | Anonymous payloads, tmp staging, deleted libraries |

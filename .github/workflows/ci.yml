@@ -57,13 +57,24 @@ jobs:
       - name: Make wrapper executable
         run: chmod +x gradlew
 
+      - name: Native probe regression tests
+        run: |
+          c++ -std=c++17 -Wall -Wextra -Werror runtime/src/main/cpp/probe_test.cpp -o "$RUNNER_TEMP/apparmorx-native-tests"
+          "$RUNNER_TEMP/apparmorx-native-tests"
+
       - name: Unit tests, plugin validation, lint, publish to Maven Local
-        run: ./gradlew check validatePlugins lintRelease publishToMavenLocal -PreleaseVersion=0.1.0 --configuration-cache --stacktrace
+        run: ./gradlew check validatePlugins lintRelease publishToMavenLocal -PreleaseVersion=0.1.1 --configuration-cache --stacktrace
 
       # The sample consumes the plugin through includeBuild("..") and has no wrapper of its own.
       - name: Sample release build (R8) + protection report
         working-directory: sample
         run: ../gradlew assembleRelease --configuration-cache --stacktrace
+
+      - name: Publish candidate to an isolated local repository
+        run: ./gradlew :plugin:publishAllPublicationsToCandidateRepository -PreleaseVersion=0.1.1-SNAPSHOT -Papparmorx.candidateRepository="$RUNNER_TEMP/candidate-repository" --configuration-cache
+
+      - name: Verify candidate external-JAR firewall in signed R8 output
+        run: python3 scripts/verify-public-consumer.py --version 0.1.1-SNAPSHOT --repository "$RUNNER_TEMP/candidate-repository" --work-dir "$RUNNER_TEMP/candidate-consumer" --verify-dependency
 
       - name: Upload reports
         if: always()
@@ -76,6 +87,9 @@ jobs:
             runtime/build/reports/lint-results-release.*
             sample/build/reports/apparmorx/
             plugin/build/test-results/
+            ${{ runner.temp }}/candidate-consumer/build-*.log
+            ${{ runner.temp }}/candidate-consumer/build/reports/apparmorx/
+            ${{ runner.temp }}/candidate-consumer/disassembly.txt
 
   # "Device farm": runs the sample's instrumented tests on emulators across API levels.
   # x86_64 emulators on a Linux runner, hardware-accelerated through KVM.
@@ -172,3 +186,28 @@ jobs:
           name: emulator-api-${{ matrix.api }}
           if-no-files-found: ignore
           path: sample/build/reports/androidTests/
+
+  public-consumer:
+    name: Published plugin consumer (isolated)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install consumer SDK
+        run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
+      - name: Verify public 0.1.1 installation, signed R8 build and cache reuse
+        run: python3 scripts/verify-public-consumer.py --work-dir "$RUNNER_TEMP/public-consumer"
+      - name: Preserve consumer evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-consumer-evidence
+          if-no-files-found: ignore
+          path: |
+            ${{ runner.temp }}/public-consumer/build-*.log
+            ${{ runner.temp }}/public-consumer/build/reports/apparmorx/

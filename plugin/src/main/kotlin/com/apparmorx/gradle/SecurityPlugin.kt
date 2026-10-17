@@ -66,7 +66,10 @@ class SecurityPlugin : Plugin<Project> {
                 }
                 variant.sources.assets?.addGeneratedSourceDirectory(task, PrepareSecurityPolicy::outputDirectory)
                 variant.instrumentation.apply {
+                    // Lifecycle guards remain scoped to app components. The separate ALL pass covers supported
+                    // calls in external JAR/AAR dependencies without synthesizing their lifecycle methods.
                     transformClassesWith(GuardClassVisitorFactory::class.java, InstrumentationScope.PROJECT) {}
+                    transformClassesWith(DependencyFirewallClassVisitorFactory::class.java, InstrumentationScope.ALL) {}
                     setAsmFramesComputationMode(FramesComputationMode.COMPUTE_FRAMES_FOR_INSTRUMENTED_METHODS)
                 }
                 val coverage = project.tasks.register("verify${name}ProtectionCoverage", VerifyProtectionCoverage::class.java) {

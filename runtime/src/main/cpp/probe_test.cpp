@@ -18,6 +18,18 @@ int main() {
     // the "clean" clear this used to return: that silently hid every such denial as a pass.
     assert(selinux_eval(std::nullopt) == Status::unavailable);
     assert(selinux_eval(std::string("")) == Status::unavailable);
+    assert(selinux_eval(std::string("garbage")) == Status::unavailable);
+    assert(selinux_eval(std::string("1junk")) == Status::unavailable);
+    assert(selinux_eval(std::string(" \t\n")) == Status::unavailable);
+    assert(selinux_eval(std::string(" 1\r\n")) == Status::clear);
+    assert(selinux_eval(std::string(" 0\n")) == Status::detected);
+    assert(wchan_eval(std::nullopt) == Status::unavailable);
+    assert(wchan_eval(std::string("")) == Status::unavailable);
+    assert(wchan_eval(std::string("0")) == Status::clear);
+    assert(wchan_eval(std::string("futex_wait_queue_me")) == Status::clear);
+    assert(wchan_eval(std::string("ptrace_stop")) == Status::detected);
+    assert(wchan_eval(std::string("sys_ptrace")) == Status::detected);
+    assert(wchan_eval(std::string("do_signal_stop")) == Status::detected);
     assert(is_arm64_trampoline(0x58000050, 0xd61f0200));
     assert(is_arm64_trampoline(0x58000051, 0xd61f0220));
     assert(is_arm64_trampoline(0x58000048, 0xd61f0100)); // ldr x8, #8; br x8

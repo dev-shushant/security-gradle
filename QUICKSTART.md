@@ -1,12 +1,18 @@
 # AppArmorX Quickstart
 
 **Author & maintainer:** Shushant Tiwari (`com.apparmorx`, plugin id `com.apparmorx.security`)
-**Version:** `0.1.0` (pre-release, published on the Gradle Plugin Portal)
+**Version:** `0.1.1` (pre-1.0 patch release)
 **Target:** Android application modules, `minSdk` 29+, ABIs `arm64-v8a` and `x86_64`
 
 AppArmorX is applied as a single Gradle plugin. You do not write initialization code or callbacks; the
 plugin changes the build output, not your source tree. Read [Honest limits](#honest-limits) before relying
 on it for anything.
+
+## Published-version coverage note
+
+Version **0.1.1** adds supported external dependency JAR/AAR call-site rewriting. Version **0.1.0**
+instrumented project bytecode only. Framework, AndroidX and AppArmorX runtime namespaces are excluded
+from the dependency pass. The firewall does not cover arbitrary injected code or every Android API.
 
 ## Tested toolchain
 
@@ -38,7 +44,7 @@ To evaluate an unreleased local build of this repository instead, publish to Mav
 `mavenLocal()` first in the same block:
 
 ```bash
-./gradlew publishToMavenLocal -PreleaseVersion=0.1.0 --configuration-cache
+./gradlew publishToMavenLocal -PreleaseVersion=0.1.1 --configuration-cache
 ```
 
 ## 2. Apply the plugin
@@ -48,7 +54,7 @@ In your application module (applying it to a library module fails the build by d
 ```kotlin
 plugins {
     id("com.android.application")
-    id("com.apparmorx.security") version "0.1.0"
+    id("com.apparmorx.security") version "0.1.1"
 }
 ```
 
@@ -60,7 +66,7 @@ plugins {
 
 During the build the plugin:
 
-1. verifies the signed policy (Ed25519, with a rollback floor);
+1. verifies a configured signed policy (Ed25519, with a rollback floor), or uses bundled defaults when no signed policy is configured;
 2. rewrites supported bytecode: guards in Activities, Services, BroadcastReceivers and the Application class,
    and reroutes supported clipboard, identifier, location and TLS-setup calls;
 3. bundles the native engine for `arm64-v8a` and `x86_64`;
@@ -150,9 +156,10 @@ when (SecurityGuard.lastObservedState()) {
 }
 ```
 
-`HardwareAttestation` (Android Keystore key attestation) and `PlayIntegrityAdapter` (reflection-based, no hard
-dependency) are also available as optional building blocks. Their results only mean something when your
-server verifies them. If Play is absent there is no verdict, never a fabricated one.
+`HardwareAttestation` is an optional Android Keystore building block. `PlayIntegrityAdapter` currently
+only checks client-library presence and hashes transaction data; it does **not** request or verify
+Play Integrity tokens. A complete client/server integration remains future work. Attestation evidence
+requires independent server verification; absence of Play never produces a fabricated verdict.
 
 ## 7. CI example: upload SARIF
 

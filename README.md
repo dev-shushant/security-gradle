@@ -9,7 +9,7 @@
   <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-3fb950"></a>
   <a href=".github/workflows/ci.yml"><img alt="CI" src="https://github.com/dev-shushant/security-gradle/actions/workflows/ci.yml/badge.svg"></a>
   <img alt="Android minSdk 29" src="https://img.shields.io/badge/minSdk-29-3ddc84">
-  <img alt="Status: pre-release" src="https://img.shields.io/badge/status-pre--release%200.1.0-d29922">
+  <img alt="Status: pre-release" src="https://img.shields.io/badge/status-pre--release%200.1.1-d29922">
 </p>
 
 <p align="center">
@@ -23,12 +23,16 @@
 
 ---
 
+> **0.1.1 patch:** adds supported external dependency JAR/AAR call rewriting and hardens unavailable/malformed evidence handling.
+> Version 0.1.0 covered project bytecode only. See [qualification evidence](docs/RELEASE-QUALIFICATION-0.1.1.md).
+> AppArmorX remains pre-1.0; supported coverage and recorded limits still apply.
+
 ## One plugin. No security code.
 
 ```kotlin
 plugins {
     id("com.android.application")
-    id("com.apparmorx.security") version "0.1.0"
+    id("com.apparmorx.security") version "0.1.1"
 }
 ```
 
@@ -62,7 +66,7 @@ checking. The right column is the measured result on a Pixel 7 Pro.
 
 | Build time (Gradle) | On the device (runtime) |
 |---|---|
-| Verifies the signed policy (Ed25519, rollback floor) | Startup gate before the first screen |
+| Verifies configured signed policy (Ed25519, rollback floor), otherwise bundled defaults | Startup gate before the first screen |
 | ASM bytecode rewrite: guards + firewall rerouting | 28 checks across JVM, framework and native C++ |
 | Bundles the native engine (`arm64-v8a`, `x86_64`) | Dependency firewall for SDK call sites |
 | Audits the merged manifest, emits SARIF | Configurable response: observe, warn, block, finish |
@@ -108,11 +112,12 @@ checking. The right column is the measured result on a Pixel 7 Pro.
 ```kotlin
 plugins {
     id("com.android.application")
-    id("com.apparmorx.security") version "0.1.0"
+    id("com.apparmorx.security") version "0.1.1"
 }
 ```
 
-`gradlePluginPortal()` is enabled by default in Gradle. No other repository is needed.
+Gradle uses the Plugin Portal by default. If your app declares `pluginManagement.repositories`, include
+`gradlePluginPortal()` alongside `google()` and `mavenCentral()`. See [repository setup](QUICKSTART.md#1-make-the-plugin-resolvable).
 
 **2. Build**
 
@@ -186,7 +191,7 @@ The complete list, including what spawn-time injection can still do: **[docs/HON
 [Quickstart](QUICKSTART.md) · [User guide](docs/USER-GUIDE.md) · [Architecture & threat model](docs/ARCHITECTURE.md) ·
 [Probe matrix](docs/PROBE-MATRIX.md) · [Hooking response](docs/HOOKING-RESPONSE.md) · [Telemetry](docs/TELEMETRY.md) ·
 [Design specification](docs/DESIGN-SPEC.md) · [Policy format](docs/POLICY.md) · [Validation](docs/VALIDATION.md) ·
-[Status](docs/STATUS.md) · [Roadmap research](docs/RESEARCH-ROADMAP.md) · [Release notes](docs/RELEASE-NOTES-v0.1.0.md) ·
+[Status](docs/STATUS.md) · [Roadmap research](docs/RESEARCH-ROADMAP.md) · [Release notes](docs/RELEASE-NOTES-v0.1.1.md) ·
 [Security policy](SECURITY.md) · [Contributing](CONTRIBUTING.md)
 
 ## Ownership & license

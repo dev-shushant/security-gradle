@@ -120,12 +120,7 @@ Status hardware_devices() {
 }
 
 Status ptrace_wchan() {
-    const auto wchan = read_bounded("/proc/self/wchan");
-    if (!wchan) return Status::clear;
-    if (apparmorx::contains_indicator(*wchan, {"ptrace_stop", "sys_ptrace", "do_signal_stop"})) {
-        return Status::detected;
-    }
-    return Status::clear;
+    return apparmorx::wchan_eval(read_bounded("/proc/self/wchan"));
 }
 
 Status frida_ports() {

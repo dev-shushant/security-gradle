@@ -62,3 +62,13 @@ publishing.publications.withType<MavenPublication>().configureEach {
         developers { developer { name.set("Shushant Tiwari"); organization.set("AppArmorX"); organizationUrl.set("https://apparmorx.com") } }
     }
 }
+
+// Explicit local-only candidate repository for release qualification; never a publication endpoint.
+providers.gradleProperty("apparmorx.candidateRepository").orNull?.let { candidatePath ->
+    publishing.repositories {
+        maven {
+            name = "candidate"
+            url = uri(file(candidatePath))
+        }
+    }
+}

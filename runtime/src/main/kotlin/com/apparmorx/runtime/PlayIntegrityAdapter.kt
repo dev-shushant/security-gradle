@@ -4,9 +4,9 @@ import android.content.Context
 import java.security.MessageDigest
 
 /**
- * Zero-overhead Google Play Integrity API adapter.
- * Uses reflection-based invocation to dynamically bind standard/classic integrity requests
- * without creating a hard dependency on Play Services libraries.
+ * Preparatory helpers for a future Google Play Integrity integration.
+ * Detects client-library presence and hashes transaction data without a hard dependency.
+ * Does not request tokens, verify verdicts, or establish device trust.
  *
  * Authored by Shushant Tiwari • com.apparmorx
  */

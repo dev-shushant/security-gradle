@@ -89,3 +89,7 @@ Also: dedupe on `eventId`, respond `2xx` quickly (any other status makes the app
   need to bind a request to a genuine device.
 - A compromised device can suppress or forge reports. Absence of reports is not proof of safety.
 - Rotate the key by shipping a new build; old builds keep using the key they were built with.
+
+
+Client-held HMAC credentials must never be accepted as proof of an uncompromised app or used to
+authorize valuable operations. Treat incident reports as untrusted input even when the signature verifies.

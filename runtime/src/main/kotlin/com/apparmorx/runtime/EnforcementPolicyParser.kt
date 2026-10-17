@@ -7,16 +7,16 @@ internal fun parseEnforcementPolicy(properties: Properties): EnforcementPolicy {
     val action = requireNotNull(properties.getProperty("restrictedAction")) { "Missing restrictedAction" }
     val unavailable = requireNotNull(properties.getProperty("enforceIndeterminate")) { "Missing enforceIndeterminate" }
     require(unavailable == "true" || unavailable == "false") { "Invalid enforceIndeterminate" }
-    val failClosed = properties.getProperty("failClosedOnStartup", "false") == "true"
-    val secureScreen = properties.getProperty("secureScreen", "false") == "true"
-    val filterTouches = properties.getProperty("filterTouches", "false") == "true"
+    val failClosed = properties.optionalBoolean("failClosedOnStartup")
+    val secureScreen = properties.optionalBoolean("secureScreen")
+    val filterTouches = properties.optionalBoolean("filterTouches")
     val telemetryUrl = properties.getProperty("telemetryUrl", "").trim()
-    val firewallClipboard = properties.getProperty("firewallClipboard", "false") == "true"
-    val firewallIdentifiers = properties.getProperty("firewallIdentifiers", "false") == "true"
-    val firewallLocation = properties.getProperty("firewallLocation", "false") == "true"
-    val firewallNetworkSecurity = properties.getProperty("firewallNetworkSecurity", "false") == "true"
-    val antiPtraceHardening = properties.getProperty("antiPtraceHardening", "false") == "true"
-    val killOnConfirmedHooking = properties.getProperty("killOnConfirmedHooking", "false") == "true"
+    val firewallClipboard = properties.optionalBoolean("firewallClipboard")
+    val firewallIdentifiers = properties.optionalBoolean("firewallIdentifiers")
+    val firewallLocation = properties.optionalBoolean("firewallLocation")
+    val firewallNetworkSecurity = properties.optionalBoolean("firewallNetworkSecurity")
+    val antiPtraceHardening = properties.optionalBoolean("antiPtraceHardening")
+    val killOnConfirmedHooking = properties.optionalBoolean("killOnConfirmedHooking")
     val telemetryHmacKey = properties.getProperty("telemetryHmacKey", "").trim()
     val detailRaw = properties.getProperty("telemetryDetail", TelemetryDetail.STANDARD.name).trim()
     val telemetryDetail = TelemetryDetail.entries.firstOrNull { it.name == detailRaw }
@@ -46,4 +46,11 @@ internal fun parseEnforcementPolicy(properties: Properties): EnforcementPolicy {
         antiPtraceHardening = antiPtraceHardening,
         killOnConfirmedHooking = killOnConfirmedHooking,
     )
+}
+
+/** Missing optional fields retain legacy defaults; malformed present fields invalidate policy. */
+private fun Properties.optionalBoolean(name: String): Boolean {
+    val value = getProperty(name) ?: return false
+    require(value == "true" || value == "false") { "Invalid $name" }
+    return value == "true"
 }

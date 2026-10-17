@@ -37,7 +37,16 @@ class InitializationTest {
         assertEquals(Status.CLEAR, snapshot.evidence.single { it.check == "hook-classes" }.status)
         assertEquals(Status.CLEAR, snapshot.evidence.single { it.check == "build-tags" }.status)
         assertEquals(Status.CLEAR, snapshot.evidence.single { it.check == "network-cleartext-permitted" }.status)
-        assertEquals(Status.CLEAR, snapshot.evidence.single { it.check == "native-selinux" }.status)
+        // SELinux may deny its own status file to untrusted_app. Compare with an actual read in
+        // this same instrumented process, rather than claiming a denied probe must be CLEAR.
+        val selinuxRead = runCatching { java.io.File("/sys/fs/selinux/enforce").readText() }.getOrNull()
+        val expectedSelinux = when {
+            selinuxRead.isNullOrEmpty() -> Status.UNAVAILABLE
+            selinuxRead.startsWith("0") -> Status.DETECTED
+            else -> Status.CLEAR
+        }
+        assertEquals("SELinux evidence must reflect app-sandbox read availability", expectedSelinux,
+            snapshot.evidence.single { it.check == "native-selinux" }.status)
         assertEquals(Status.CLEAR, snapshot.evidence.single { it.check == "native-hook-trampoline" }.status)
         assertEquals(Status.CLEAR, snapshot.evidence.single { it.check == "native-hardware-device" }.status)
         // The environment probe must be right on both kinds of device: CLEAR on real hardware, DETECTED
@@ -49,8 +58,24 @@ class InitializationTest {
             snapshot.evidence.single { it.check == "environment-hardware" }.status,
         )
         assertEquals(Status.CLEAR, snapshot.evidence.single { it.check == "virtual-space" }.status)
-        assertEquals(Status.CLEAR, snapshot.evidence.single { it.check == "native-wchan" }.status)
-        assertEquals(Status.CLEAR, snapshot.evidence.single { it.check == "native-frida-port" }.status)
+        val wchanRead = runCatching { java.io.File("/proc/self/wchan").readText() }.getOrNull()
+        val expectedWchan = when {
+            wchanRead.isNullOrEmpty() -> Status.UNAVAILABLE
+            listOf("ptrace_stop", "sys_ptrace", "do_signal_stop").any { wchanRead.contains(it) } -> Status.DETECTED
+            else -> Status.CLEAR
+        }
+        assertEquals("Wait-channel probe must preserve read failures", expectedWchan,
+            snapshot.evidence.single { it.check == "native-wchan" }.status)
+        val tcpReads = listOf("/proc/net/tcp", "/proc/net/tcp6").map { path ->
+            runCatching { java.io.File(path).readText() }.getOrNull()
+        }
+        val expectedPorts = when {
+            tcpReads.any { it?.contains(":69a2", ignoreCase = true) == true } -> Status.DETECTED
+            tcpReads.any { it == null } -> Status.UNAVAILABLE
+            else -> Status.CLEAR
+        }
+        assertEquals("TCP probe must not treat denied reads as clean", expectedPorts,
+            snapshot.evidence.single { it.check == "native-frida-port" }.status)
         assertEquals(Status.CLEAR, snapshot.evidence.single { it.check == "native-memory-rwx" }.status)
         assertEquals(Status.CLEAR, snapshot.evidence.single { it.check == "native-stealth-injection" }.status)
         assertEquals(Status.CLEAR, snapshot.evidence.single { it.check == "native-relocation-integrity" }.status)

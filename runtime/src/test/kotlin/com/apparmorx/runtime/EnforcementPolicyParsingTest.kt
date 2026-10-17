@@ -59,4 +59,24 @@ class EnforcementPolicyParsingTest {
             assertThrows(IllegalArgumentException::class.java) { parseEnforcementPolicy(config().apply { remove(key) }) }
         }
     }
+    @Test fun rejectsMalformedOptionalSecurityFlagsRatherThanSilentlyDisablingProtection() {
+        val flags = listOf("failClosedOnStartup", "secureScreen", "filterTouches", "firewallClipboard",
+            "firewallIdentifiers", "firewallLocation", "firewallNetworkSecurity", "antiPtraceHardening",
+            "killOnConfirmedHooking")
+        for (flag in flags) {
+            for (value in listOf("TRUE", "yes", "", " true", "false ")) {
+                assertThrows("$flag=$value", IllegalArgumentException::class.java) {
+                    parseEnforcementPolicy(config().apply { setProperty(flag, value) })
+                }
+            }
+        }
+    }
+    @Test fun optionalSecurityFlagsStillAllowExplicitFalseAndAbsentLegacyDefaults() {
+        val flags = listOf("failClosedOnStartup", "secureScreen", "filterTouches", "firewallClipboard",
+            "firewallIdentifiers", "firewallLocation", "firewallNetworkSecurity", "antiPtraceHardening",
+            "killOnConfirmedHooking")
+        val explicit = config().apply { flags.forEach { setProperty(it, "false") } }
+        assertEquals(parseEnforcementPolicy(config()), parseEnforcementPolicy(explicit))
+    }
+
 }

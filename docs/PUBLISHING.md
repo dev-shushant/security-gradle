@@ -43,8 +43,9 @@ launched on a Pixel 7 Pro.
 | 7 | Honest launch copy reviewed (see `docs/launch/`), no unbypassable/"enterprise-certified" claims | Owner | drafts ready |
 | 8 | Credential hygiene: remote URL contains no token; leaked tokens revoked; commit author email is the intended public one | Owner | **partly done**: history rewritten to the intended author email; token review still open |
 
-Do not publish while any row is open. A security product that ships with a broken first-run experience or an
-overstated claim is worse than one that ships a week later.
+The owner explicitly authorized the 0.1.1 corrective patch on 17 October 2026 with the broader assurance
+gates still open. This authorization is scoped to the documented patch, not a 1.0 stability or commercial-parity claim.
+See [0.1.1 qualification](RELEASE-QUALIFICATION-0.1.1.md) for final local evidence.
 
 ## Release steps (after the gate)
 
@@ -75,3 +76,10 @@ id goes through Gradle's manual approval, which cannot be hurried or guaranteed.
 | Host language | Kotlin (sample), Java-only (clean-room) | Flutter, React Native, Unity |
 
 State this table, not "works on all Android", in every public post.
+
+
+## 0.1.1 patch publication
+
+Owner authorized publication on 17 October 2026. Exact-version validation and upload are being performed.
+Local evidence: 171 unit tests, native regressions, lint/plugin validation, isolated signed R8 consumer
+with dependency rewrite verification, and 21/21 final Android 17 arm64 emulator tests.

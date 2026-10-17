@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <charconv>
 #include <cctype>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -33,8 +34,17 @@ inline Status selinux_eval(const std::optional<std::string>& text) {
     // itself denies untrusted_app read access to /sys/fs/selinux/enforce on some devices, and that
     // denial must not be silently reported as "SELinux is enforcing" (clear).
     if (!text || text->empty()) return Status::unavailable;
-    if ((*text)[0] == '0') return Status::detected;
-    return Status::clear;
+    const auto first = text->find_first_not_of(" \t\r\n");
+    if (first == std::string::npos) return Status::unavailable;
+    const auto value = text->substr(first, text->find_last_not_of(" \t\r\n") - first + 1);
+    if (value == "0") return Status::detected;
+    if (value == "1") return Status::clear;
+    return Status::unavailable;
+}
+inline Status wchan_eval(const std::optional<std::string>& text) {
+    if (!text || text->empty()) return Status::unavailable;
+    return contains_indicator(*text, {"ptrace_stop", "sys_ptrace", "do_signal_stop"})
+        ? Status::detected : Status::clear;
 }
 inline bool is_arm64_trampoline(uint32_t insn0, uint32_t insn1) {
     // 1. ldr x16, #8 ; br x16 (Frida / Substrate)

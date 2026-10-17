@@ -1,6 +1,7 @@
 # AppArmorX handoff — 2026-10-13 (consolidated)
 
-This file is the single current source of truth for AppArmorX's verified capabilities and operational status.
+Historical consolidated evidence. For the current unpublished patch candidate and its release gates,
+see [0.1.1 qualification](RELEASE-QUALIFICATION-0.1.1.md). The dated outcomes below retain their original scope.
 
 ## Product contract
 Apply the plugin to install owned protection artifacts, initialization, monitoring and configured
@@ -239,9 +240,9 @@ authorization.
 ## Important limits — still open
 - **Confirmed by real attack, not assumed, with a now-partial mitigation**: a root+Frida attacker who
   gets code running in-process can call Android framework TLS APIs directly and defeat network security
-  entirely. With the owner-approved `killOnConfirmedHooking` + `HookWatchdog` (Slice 22/23), a confirmed
-  hooking attach to an *already-running* process is now actually prevented in practice (verified: the
-  process dies before the attacker's script can install its bypass). Spawn-time injection
+  entirely. With the owner-approved `killOnConfirmedHooking` + `HookWatchdog` (Slice 22/23), the recorded
+  attach-mode payload was stopped in its tested environment/timing. This is not proof that every attach
+  attack is prevented; periodic checks cannot stop the action already in flight. Spawn-time injection
   (`frida -f`) remains unclosable -- the attacker's code runs before this library's first instruction,
   which no userspace response can outrace. State both outcomes together, never one without the other.
 - **Anti-ptrace hardening (`antiPtraceHardening`) does not close that gap either, confirmed by testing
@@ -273,20 +274,13 @@ the UI thread. This is foreground monitoring only, not a background service and 
 3. **Deeper native integrity** (PLT/GOT, executable-segment checks) with adversarial + clean-device
    fixtures.
 4. **Opt-in bounded reporting and reviewed signed rule promotion** (THREAT-FEEDBACK.md).
-5. **Play Integrity API client-side support** (deliberately deferred, not started — owner decision
-   2026-10-14). This is the one architecturally different answer to "why can't this close the
-   spawn-mode gap": every paid RASP product has the exact same client-side race-against-physics
-   limit (Slice 19) and markets around it with obfuscation, not a real fix. The actual industry answer
-   for anything that matters (banking, DRM) is to move the trust decision out of the vulnerable process
-   entirely — a hardware-backed attestation token from Google Play Services (a separate, protected
-   process the attacker's in-app hooks cannot reach), verified server-side before anything sensitive is
-   served. Would require: a new Google Play Services dependency (first external dependency beyond
-   asm/kotlin-stdlib), a client-side token-request helper, and — critically — the app owner's own
-   server doing the actual verification; this library can only ever provide the client half. Caveat to
-   state honestly if/when built: Play Integrity's own "basic integrity" level is itself not unbypassable;
-   only hardware-backed "strong integrity"/device attestation is genuinely hard to spoof, and even that
-   is a different trust model (Google's, not this library's) layered on top of everything else here, not
-   a replacement for it.
+5. **Complete optional Play Integrity integration.** Preparatory library-presence and hashing helpers
+   exist in PlayIntegrityAdapter.kt; token requesting and server verification are not implemented.
+   The app owner must verify request binding, expected app identity, freshness and business authorization
+   on their own server. No client-only result makes a compromised process trustworthy.
+
+See [ROADMAP.md](ROADMAP.md) for the 2026-10-17 release sequence; the older order above includes
+already-implemented component/reporting work and must not be read as a current implementation checklist.
 
 Preserve: tests-before-security-changes, configuration-cache compatibility, explicit
 UNAVAILABLE/INDETERMINATE semantics that never silently escalate or silently clear. Do not call a

@@ -7,21 +7,14 @@ Security claims should be falsifiable, so these are stated up front. This is the
   patch any client-side protection. AppArmorX raises attacker cost and gives you evidence; it does not
   make a compromised device trustworthy.
 - **Client-side checks complement server-side authorisation; they never replace it.**
-- **The dependency firewall protects the app's own code; it cannot protect against an attacker who
-  bypasses that code entirely.** A root+Frida attacker calling Android framework TLS APIs directly
-  (not through the app's own call sites) can still complete a MITM attack — confirmed by a real,
-  reproduced attack, not assumed. This is a universal limitation of client-side RASP, not specific to
-  AppArmorX: no competing product, free or paid, can sandbox further API calls made by an attacker who
-  already has code executing in-process. `killOnConfirmedHooking` + `HookWatchdog` close this for an
-  attacker who attaches to an already-running process (verified); nothing closes it for spawn-time
-  injection (verified it doesn't, on the same attack, same session). State both outcomes together —
-  see [STATUS.md](STATUS.md) Slices 16–23 for the full, honest accounting, including a native
-  anti-ptrace trick that was tried and found ineffective on modern SELinux-enforcing devices.
-- **Paid RASP products have the same spawn-time limit; they do not publish a fix for it either.** The
-  one architecturally different answer — moving the trust decision to a hardware-backed, server-verified
-  attestation (Google Play Integrity) that lives outside the vulnerable process — is a deliberately
-  deferred roadmap item, not implemented, tracked in [STATUS.md](STATUS.md)'s "Next
-  implementation order".
+- **The dependency firewall covers supported rewritten call sites, not arbitrary code executing in the process.**
+  A reproduced Frida payload called framework TLS APIs directly and completed a MITM request. The opt-in
+  watchdog stopped the recorded attach-mode payload in its tested timing/environment, but cannot promise
+  prevention of every attach attack or the action already in flight. Spawn-time injection also succeeded.
+  See [VALIDATION.md](VALIDATION.md) for both results; no independent comparison with commercial products was performed.
+- **Server-side decisions remain necessary for valuable operations.** PlayIntegrityAdapter currently
+  provides library-presence and hashing helpers only, not token requests or a verified client/server flow.
+  Attestation integration is future work and would complement server authorization, not replace it.
 - **Tested on one physical device family so far.** The supported toolchain/OS/ABI matrix is still being
   built. Magisk/Zygisk cloaking evolves and is an ongoing test area. No independent penetration test has
   been performed.
