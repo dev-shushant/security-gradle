@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.22.1)
+project(apparmorx LANGUAGES CXX)
+add_library(apparmorx SHARED engine.cpp)
+target_compile_features(apparmorx PRIVATE cxx_std_17)
+target_compile_options(apparmorx PRIVATE -Wall -Wextra -Werror -fvisibility=hidden -fstack-protector-strong)
+target_link_options(apparmorx PRIVATE -Wl,-z,relro,-z,now,-z,noexecstack -Wl,-z,max-page-size=16384)
+target_link_libraries(apparmorx PRIVATE dl)

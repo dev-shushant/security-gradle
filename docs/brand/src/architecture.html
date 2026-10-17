@@ -1,0 +1,38 @@
+<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="common.css">
+<style>body{width:1600px;height:900px}
+h1{position:absolute;left:70px;top:44px;font-size:46px;letter-spacing:-1.5px;font-weight:800}
+.lane{position:absolute;left:50px;right:50px;border:1px dashed var(--line);border-radius:26px}
+.lane .lbl{position:absolute;left:28px;top:-14px;background:var(--bg);padding:0 14px;color:var(--accent);font-weight:800;letter-spacing:2px;font-size:15px}
+.b{position:absolute;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px 22px}
+.b h3{font-size:21px;margin-bottom:10px;letter-spacing:-.3px}
+.b li{list-style:none;color:var(--muted);font-size:16.5px;line-height:1.55;padding-left:20px;position:relative}
+.b li:before{content:"";position:absolute;left:2px;top:.62em;width:7px;height:7px;border-radius:50%;background:var(--accent)}
+.hl{border-color:var(--accent);box-shadow:0 0 0 1px rgba(94,180,255,.25),0 18px 50px rgba(29,111,209,.3)}
+.ok{border-color:rgba(52,211,153,.6)}.warn{border-color:rgba(251,191,36,.55)}
+.sm{color:var(--muted);font-size:15px}
+svg{position:absolute;inset:0;pointer-events:none}
+.logo{position:absolute;right:70px;top:40px;font-size:30px}
+.chip{display:inline-block;font:700 13px ui-monospace,Menlo,monospace;padding:3px 9px;border-radius:8px;margin-right:6px}
+.c1{background:rgba(52,211,153,.15);color:var(--green)}.c2{background:rgba(248,113,113,.15);color:var(--red)}.c3{background:rgba(251,191,36,.15);color:var(--amber)}
+</style>
+<div class="wrap"><div class="glow"></div><div class="grid"></div>
+<h1>How AppArmorX works</h1>
+<div class="brand logo"><img src="../logo-mark.svg"><span>AppArmor<span class="accent">X</span></span></div>
+
+<div class="lane" style="top:140px;height:330px"><span class="lbl">AT BUILD TIME · GRADLE</span></div>
+<div class="b" style="left:90px;top:190px;width:330px;height:210px"><h3>Your app</h3><ul><li>Kotlin or Java, any architecture</li><li>No SDK, no init calls</li><li><b style="color:var(--text)">Source is never edited</b></li></ul></div>
+<div class="b hl" style="left:520px;top:172px;width:600px;height:246px"><h3>com.apparmorx.security</h3><ul><li>Verifies the signed policy, derives your signer pin from the release config</li><li>Rewrites bytecode: guards in Activities, Services, Receivers</li><li>Reroutes SDK calls (clipboard, device ID, location, TLS) through the firewall</li><li>Embeds the runtime and native engines (arm64, x86_64)</li><li>Audits the manifest, verifies the packaged APK</li></ul></div>
+<div class="b ok" style="left:1220px;top:190px;width:290px;height:210px"><h3>Protected APK</h3><ul><li>HTML report</li><li>SARIF for code scanning</li><li>JSON coverage + digests</li><li class="sm">Build fails if protection is missing</li></ul></div>
+
+<div class="lane" style="top:520px;height:330px"><span class="lbl">ON THE DEVICE · RUNTIME</span></div>
+<div class="b" style="left:90px;top:572px;width:360px;height:230px"><h3>Dependency firewall</h3><ul><li>Third-party SDK reads clipboard, device ID, location</li><li>Gets nothing / a blank ID</li><li>Trust-all TLS verifier rejected</li></ul></div>
+<div class="b hl" style="left:520px;top:560px;width:430px;height:254px"><h3>28 checks, 5 groups</h3><ul><li>Tamper · debugging · root</li><li>Hooking &amp; injection (native, direct syscalls)</li><li>Environment</li></ul><div style="margin-top:12px"><span class="chip c1">CLEAR</span><span class="chip c2">DETECTED</span><span class="chip c3">UNAVAILABLE</span></div><div class="sm" style="margin-top:8px">Unavailable is never treated as safe</div></div>
+<div class="b" style="left:1020px;top:572px;width:230px;height:230px"><h3>Response</h3><ul><li>Observe</li><li>Warn</li><li>Block screen</li><li>Mirage delay</li></ul></div>
+<div class="b ok" style="left:1320px;top:572px;width:230px;height:230px"><h3>Your server</h3><ul><li>Signed JSON report</li><li>Offline queue</li><li class="sm">Opt-in, HTTPS only</li></ul></div>
+
+<svg viewBox="0 0 1600 900" fill="none" stroke="#5EB4FF" stroke-width="3">
+<defs><marker id="m" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10z" fill="#5EB4FF" stroke="none"/></marker></defs>
+<path d="M424 295H512" marker-end="url(#m)"/><path d="M1124 295H1212" marker-end="url(#m)"/>
+<path d="M454 687H512" marker-end="url(#m)"/><path d="M954 687H1012" marker-end="url(#m)"/><path d="M1254 687H1312" marker-end="url(#m)"/>
+<path d="M1360 404V500H400V564" stroke-dasharray="7 7" marker-end="url(#m)" opacity=".6"/>
+</svg></div>
