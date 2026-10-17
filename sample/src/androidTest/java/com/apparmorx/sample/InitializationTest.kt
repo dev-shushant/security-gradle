@@ -48,7 +48,26 @@ class InitializationTest {
         assertEquals("SELinux evidence must reflect app-sandbox read availability", expectedSelinux,
             snapshot.evidence.single { it.check == "native-selinux" }.status)
         assertEquals(Status.CLEAR, snapshot.evidence.single { it.check == "native-hook-trampoline" }.status)
-        assertEquals(Status.CLEAR, snapshot.evidence.single { it.check == "native-hardware-device" }.status)
+        // The native hardware probe includes emulator device paths. CI's x86_64 images expose
+        // these, while the local arm64 image may not. Independently stat from the same app sandbox;
+        // neither a legitimate emulator finding nor a permission denial may be relabeled clean.
+        val hardwarePaths = listOf("/dev/kernelsu", "/dev/apatch", "/dev/qemu_pipe", "/dev/goldfish_pipe", "/dev/vport0p1")
+        val pathEvidence = hardwarePaths.map { path ->
+            try {
+                android.system.Os.lstat(path)
+                Status.DETECTED
+            } catch (error: android.system.ErrnoException) {
+                if (error.errno == android.system.OsConstants.ENOENT || error.errno == android.system.OsConstants.ENOTDIR)
+                    Status.CLEAR else Status.UNAVAILABLE
+            }
+        }
+        val expectedHardware = when {
+            Status.DETECTED in pathEvidence -> Status.DETECTED
+            Status.UNAVAILABLE in pathEvidence -> Status.UNAVAILABLE
+            else -> Status.CLEAR
+        }
+        assertEquals("Native hardware evidence must match actual app-sandbox paths: $pathEvidence",
+            expectedHardware, snapshot.evidence.single { it.check == "native-hardware-device" }.status)
         // The environment probe must be right on both kinds of device: CLEAR on real hardware, DETECTED
         // on an emulator. A hardcoded CLEAR would only pass on a physical phone.
         val onEmulator = android.os.Build.HARDWARE.let { it.contains("ranchu") || it.contains("goldfish") } ||

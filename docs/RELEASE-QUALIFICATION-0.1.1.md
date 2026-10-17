@@ -103,3 +103,13 @@ RASP platforms, independent certification, or a completed 1.0 assurance program.
 The final sample release is the repository's packaging fixture with placeholder signing pins, not a
 production signer test. The independent consumer uses a generated test keystore, verifies APK v2 signing
 and builds without placeholder pins. Neither should be described as production deployment evidence.
+
+
+## Published 0.1.1 verification
+
+Upload passed on 17 October 2026; public marker and version page returned HTTP 200.
+The published artifact passed the independent signed R8 consumer with --version 0.1.1 --verify-dependency,
+without candidate repositories or source substitution. Evidence directory:
+/private/var/folders/3c/hdbx8q9n1tb6fy1_yfy7dxxh0000gn/T/apparmorx-public-consumer-n_inj4my.
+GitHub v0.1.1 is a published pre-release; tag points to d1dc310. Subsequent main commits fix Linux CI
+header portability and SDK setup and record post-publication evidence; the release tag is not rewritten.

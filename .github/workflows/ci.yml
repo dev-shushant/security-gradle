@@ -98,17 +98,13 @@ jobs:
     needs: build-and-verify
     runs-on: ubuntu-latest
     timeout-minutes: 40
-    # Still informational (continue-on-error) until a run is green: the same connectedDebugAndroidTest
-    # suite is proven on a local arm64 emulator and a Pixel 7 Pro (see docs/VALIDATION.md); what's
-    # unverified here is GitHub's x86_64 KVM emulator specifically, which failed to boot on the first
-    # attempt (device never appeared to adb at all -- see the kvm-diagnostics and emulator-log-on-failure
-    # steps below, added for exactly that reason). Remove this line once a run is green.
-    continue-on-error: true
+    # Both x86_64 images now boot and execute the suite in GitHub CI. Device regressions
+    # must fail the workflow rather than leave a green badge beside failed emulator jobs.
     strategy:
       fail-fast: false
       matrix:
-        # 29 and 33 are the most widely used x86_64 targets in CI (battle-tested images); 35 is verified
-        # separately on a local arm64 emulator (docs/VALIDATION.md) but not yet proven on x86_64 CI KVM.
+        # Exercise the declared minSdk and a later Android release. API 35/37 arm64 evidence
+        # is separate and does not substitute for these x86_64 lanes.
         api: [ 29, 33 ]
 
     steps:
@@ -185,7 +181,9 @@ jobs:
         with:
           name: emulator-api-${{ matrix.api }}
           if-no-files-found: ignore
-          path: sample/build/reports/androidTests/
+          path: |
+            sample/build/reports/androidTests/
+            sample/build/outputs/androidTest-results/
 
   public-consumer:
     name: Published plugin consumer (isolated)
@@ -203,7 +201,7 @@ jobs:
       - name: Install consumer SDK
         run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
       - name: Verify public 0.1.1 installation, signed R8 build and cache reuse
-        run: python3 scripts/verify-public-consumer.py --work-dir "$RUNNER_TEMP/public-consumer"
+        run: python3 scripts/verify-public-consumer.py --verify-dependency --work-dir "$RUNNER_TEMP/public-consumer"
       - name: Preserve consumer evidence
         if: always()
         uses: actions/upload-artifact@v4
