@@ -191,7 +191,7 @@ The complete list, including what spawn-time injection can still do: **[docs/HON
 [Quickstart](QUICKSTART.md) · [User guide](docs/USER-GUIDE.md) · [Architecture & threat model](docs/ARCHITECTURE.md) ·
 [Probe matrix](docs/PROBE-MATRIX.md) · [Hooking response](docs/HOOKING-RESPONSE.md) · [Telemetry](docs/TELEMETRY.md) ·
 [Design specification](docs/DESIGN-SPEC.md) · [Policy format](docs/POLICY.md) · [Validation](docs/VALIDATION.md) ·
-[Status](docs/STATUS.md) · [Roadmap research](docs/RESEARCH-ROADMAP.md) · [Release notes](docs/RELEASE-NOTES-v0.1.1.md) ·
+[Status](docs/STATUS.md) · [Platform vision](docs/PLATFORM-STRATEGY.md) · [Execution roadmap](docs/ROADMAP.md) · [Roadmap research](docs/RESEARCH-ROADMAP.md) · [Release notes](docs/RELEASE-NOTES-v0.1.1.md) ·
 [Security policy](SECURITY.md) · [Contributing](CONTRIBUTING.md)
 
 ## Ownership & license

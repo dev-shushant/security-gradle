@@ -1,6 +1,19 @@
-# AppArmorX: from 0.1.0 pre-release to a dependable Android security engine
+# AppArmorX Android execution roadmap
 
-Planning date: 2026-10-17. Baseline inspected: main at 883da67.
+Updated: 2026-10-17. Current documentation baseline: main at ce17368.
+
+The umbrella direction is now **free security infrastructure across Android, iOS, backend and web**.
+Read [Platform vision and execution strategy](PLATFORM-STRATEGY.md) for the agreed free-offering charter,
+shared architecture, cross-platform sequence and acceptance gates. This file retains the Android workstream.
+The original planning baseline below was 883da67; historical gaps must be read with this completion update:
+
+- 0.1.1 is published; isolated public/candidate signed-R8 consumers and dependency final-DEX verification exist.
+- Required API 29/33 emulator jobs and the public consumer passed in recorded CI run 39043122340 at e8fa713.
+- Play Integrity documentation now distinguishes presence/hash helpers from token requests/server verification.
+- Performance, broader physical-device coverage, signed final-payload integrity and independent review remain open.
+- The next integrated platform milestone is Android + a backend verification slice, with bounded iOS feasibility in parallel.
+
+The remaining dated schedule and baseline observations are historical planning context, not current pending-task status.
 This is a proposed execution plan, not a statement that future capabilities exist.
 Timing assumes one primary maintainer and is indicative; evidence gates determine releases.
 No code, device tests, independent assessment or remote CI status was freshly verified for this plan.
@@ -90,8 +103,8 @@ Gate: independent review of the end-to-end protocol; demonstrate allowed/denied/
 
 ## Growth after the engine earns adoption
 
-Prioritize managed policy rollout, fleet compatibility/health reports and optional self-hosted operations only when pilot teams request them. A hosted offering can later fund managed operations/support while the local core remains inspectable. Validate willingness to use/pay before promising infrastructure.
-Flutter/React Native/Unity adapters follow demonstrated demand and dedicated validation; Android-shell coverage does not protect all Dart/JavaScript/game logic. iOS is a separate architecture and research track.
+Prioritize managed policy rollout, fleet compatibility/health reports and optional self-hosted operations only when pilot teams request them. All planned AppArmorX security capabilities remain free, including self-hosted operations. Optional public hosting needs an explicit funding and cost decision; no hosted service or paid feature tier is promised. See the platform strategy for sustainability constraints.
+Flutter/React Native/Unity adapters follow demonstrated demand and dedicated validation; Android-shell coverage does not protect all Dart/JavaScript/game logic. iOS is a first-class platform direction with its own architecture and validation gates; begin with bounded feasibility alongside the shared backend foundation.
 Avoid a detector-count race, an early dashboard, mandatory cloud dependency, remote executable rules and AI-generated enforcement without review.
 
 ## Next ten working days
