@@ -203,7 +203,7 @@ jobs:
       - name: Install consumer SDK
         run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
       - name: Verify public 0.1.1 installation, signed R8 build and cache reuse
-        run: python3 scripts/verify-public-consumer.py --work-dir "$RUNNER_TEMP/public-consumer"
+        run: python3 scripts/verify-public-consumer.py --verify-dependency --work-dir "$RUNNER_TEMP/public-consumer"
       - name: Preserve consumer evidence
         if: always()
         uses: actions/upload-artifact@v4

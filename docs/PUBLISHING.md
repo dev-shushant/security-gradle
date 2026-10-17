@@ -2,7 +2,9 @@
 
 Owner: Shushant Tiwari · Plugin ID: `com.apparmorx.security` · Artifact: `com.apparmorx:apparmorx-security-plugin`
 
-**Status (17 October 2026): version `0.1.0` is live on the Gradle Plugin Portal.**
+**Current release (17 October 2026): `0.1.1` is live on the Gradle Plugin Portal and GitHub.**
+
+The following paragraph records the original 0.1.0 approval.
 Approval followed submission on 16 October 2026 after two automated checks were resolved: domain ownership
 of `apparmorx.com` (DNS TXT proof) and a public source repository. Public resolution was verified from a clean
 consumer build that lists only `gradlePluginPortal()`; the published jar contains the embedded runtime AAR
@@ -84,7 +86,8 @@ Owner authorized publication on 17 October 2026. Exact-version validation and up
 Version 0.1.1 is live at https://plugins.gradle.org/plugin/com.apparmorx.security/0.1.1;
 the anonymous plugin marker returned HTTP 200. GitHub pre-release:
 https://github.com/dev-shushant/security-gradle/releases/tag/v0.1.1 (source d1dc310).
-Public Android consumer verification is running. Initial remote CI found Linux host-header and retired
+Public Android consumer verification passed for 0.1.1: signed R8 APK, both native ABIs, reports,
+configuration-cache reuse and external-JAR clipboard rewriting in the final DEX. Initial remote CI found Linux host-header and retired
 SDK setup-package issues; a CI portability follow-up addresses these without changing runtime behavior.
 Local evidence: 171 unit tests, native regressions, lint/plugin validation, isolated signed R8 consumer
 with dependency rewrite verification, and 21/21 final Android 17 arm64 emulator tests.
