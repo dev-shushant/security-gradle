@@ -1,0 +1,174 @@
+name: AppArmorX CI & Quality Gate
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Android SDK pieces pinned by runtime/build.gradle.kts and the sample.
+  NDK_VERSION: "29.0.14206865"
+  CMAKE_VERSION: "3.22.1"
+  PLATFORM: "android-37.0"
+
+jobs:
+  build-and-verify:
+    name: Build, tests, lint, R8 sample
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # gradle/gradle-daemon-jvm.properties asks for JDK 25 (JetBrains); the plugin module compiles with a
+      # JDK 17 toolchain. Install both so nothing depends on a network download mid-build. The foojay
+      # resolver in settings.gradle.kts remains the fallback.
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up JDK 25 (Gradle daemon)
+        uses: actions/setup-java@v4
+        with:
+          distribution: jetbrains
+          java-version: '25'
+          cache: gradle
+
+      - name: Set up Android SDK components
+        run: |
+          set -euo pipefail
+          SDKMANAGER="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "platforms;${PLATFORM}" "platforms;android-34" "ndk;${NDK_VERSION}" "cmake;${CMAKE_VERSION}" > /dev/null
+          echo "sdk.dir=${ANDROID_HOME}" > local.properties
+
+      - name: Make wrapper executable
+        run: chmod +x gradlew
+
+      - name: Unit tests, plugin validation, lint, publish to Maven Local
+        run: ./gradlew check validatePlugins lintRelease publishToMavenLocal -PreleaseVersion=0.1.0 --configuration-cache --stacktrace
+
+      # The sample consumes the plugin through includeBuild("..") and has no wrapper of its own.
+      - name: Sample release build (R8) + protection report
+        working-directory: sample
+        run: ../gradlew assembleRelease --configuration-cache --stacktrace
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          if-no-files-found: ignore
+          path: |
+            **/build/reports/tests/
+            runtime/build/reports/lint-results-release.*
+            sample/build/reports/apparmorx/
+            plugin/build/test-results/
+
+  # "Device farm": runs the sample's instrumented tests on emulators across API levels.
+  # x86_64 emulators on a Linux runner, hardware-accelerated through KVM.
+  emulator-tests:
+    name: Emulator API ${{ matrix.api }}
+    needs: build-and-verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    # Still informational (continue-on-error) until a run is green: the same connectedDebugAndroidTest
+    # suite is proven on a local arm64 emulator and a Pixel 7 Pro (see docs/VALIDATION.md); what's
+    # unverified here is GitHub's x86_64 KVM emulator specifically, which failed to boot on the first
+    # attempt (device never appeared to adb at all -- see the kvm-diagnostics and emulator-log-on-failure
+    # steps below, added for exactly that reason). Remove this line once a run is green.
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        # 29 and 33 are the most widely used x86_64 targets in CI (battle-tested images); 35 is verified
+        # separately on a local arm64 emulator (docs/VALIDATION.md) but not yet proven on x86_64 CI KVM.
+        api: [ 29, 33 ]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Enable KVM group perms
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: KVM diagnostics
+        run: |
+          ls -la /dev/kvm || echo "/dev/kvm does not exist"
+          lscpu | grep -i virtualization || true
+          egrep -c '(vmx|svm)' /proc/cpuinfo || true
+          groups
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up JDK 25 (Gradle daemon)
+        uses: actions/setup-java@v4
+        with:
+          distribution: jetbrains
+          java-version: '25'
+          cache: gradle
+
+      - name: Set up Android SDK components
+        run: |
+          set -euo pipefail
+          SDKMANAGER="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "platforms;${PLATFORM}" "platforms;android-34" "ndk;${NDK_VERSION}" "cmake;${CMAKE_VERSION}" > /dev/null
+          echo "sdk.dir=${ANDROID_HOME}" > local.properties
+          chmod +x gradlew
+
+      - name: Instrumented tests on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          ram-size: 2048M
+          heap-size: 256M
+          disable-animations: true
+          emulator-boot-timeout: 900
+          # -no-metrics avoids the first-run interactive metrics-collection prompt ever blocking a
+          # headless (-no-window) launch; everything else matches what reactivecircus defaults to.
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics -camera-back none
+          working-directory: sample
+          script: ../gradlew connectedDebugAndroidTest --configuration-cache --stacktrace
+
+      - name: Dump emulator log on failure
+        if: failure()
+        run: |
+          echo "--- kernel log (last 100 lines) ---"
+          sudo dmesg | tail -100 || true
+          echo "--- emulator console/log files found under ~/.android ---"
+          find ~/.android -maxdepth 3 -iname "*.log" -o -iname "*console*" 2>/dev/null | while read -r f; do
+            echo "== $f =="; tail -100 "$f" || true
+          done
+          echo "--- /tmp emulator-related files ---"
+          find /tmp -maxdepth 2 \( -iname "*emulator*" -o -iname "*avd*" \) 2>/dev/null
+
+      - name: Upload emulator test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: emulator-api-${{ matrix.api }}
+          if-no-files-found: ignore
+          path: sample/build/reports/androidTests/

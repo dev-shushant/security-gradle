@@ -1,0 +1,13 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <provider android:name="com.apparmorx.runtime.SecurityInitializer"
+            android:authorities="${applicationId}.apparmorx.init"
+            android:exported="false"
+            android:multiprocess="true"
+            android:initOrder="100" />
+        <activity android:name="com.apparmorx.runtime.SecurityBlockActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
+    </application>
+</manifest>

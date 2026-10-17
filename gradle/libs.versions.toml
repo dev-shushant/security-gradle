@@ -1,0 +1,11 @@
+[versions]
+asm = "9.11"
+kotlin = "2.4.10"
+gradle = "9.4.1"
+junit = "4.13.2"
+
+[libraries]
+asm = { group = "org.ow2.asm", name = "asm", version.ref = "asm" }
+asm-commons = { group = "org.ow2.asm", name = "asm-commons", version.ref = "asm" }
+gradle = { group = "com.android.tools.build", name = "gradle", version.ref = "gradle" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }

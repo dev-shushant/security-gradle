@@ -1,0 +1,15 @@
+.gradle/
+.kotlin/
+**/build/
+local.properties
+.idea/*
+!.idea/runConfigurations/
+!.idea/gradle.xml
+!.idea/AndroidProjectSystem.xml
+*.key
+*.pem
+.env
+/runtime/.cxx/
+firebase-debug.log
+/.idea/
+/.claude/
