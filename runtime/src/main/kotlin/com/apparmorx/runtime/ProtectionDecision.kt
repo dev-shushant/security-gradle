@@ -13,6 +13,7 @@ internal val ADVISORY_CHECKS = setOf("network-cleartext-permitted")
 internal fun decideProtection(snapshot: SecuritySnapshot, nowMillis: Long, required: Set<String>): ProtectionState {
     if (snapshot.checkedAtMillis == 0L) return ProtectionState.CHECKING
     if (snapshot.evidence.any { it.status == Status.DETECTED && it.check !in ADVISORY_CHECKS }) return ProtectionState.RESTRICTED
+    if (snapshot.evidence.any { it.check == "scan-pending" }) return ProtectionState.CHECKING
     if (nowMillis < snapshot.checkedAtMillis || nowMillis - snapshot.checkedAtMillis > 120000L) return ProtectionState.INDETERMINATE
     if (required.any { check -> snapshot.evidence.none { it.check == check && it.status == Status.CLEAR } }) return ProtectionState.INDETERMINATE
     return ProtectionState.READY

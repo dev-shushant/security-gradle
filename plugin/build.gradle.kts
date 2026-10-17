@@ -47,7 +47,7 @@ run {
 val runtimeAar = project(":runtime").layout.buildDirectory.file("outputs/aar/runtime-release.aar")
 tasks.processResources {
     val pluginVersion = project.version.toString()
-    val kotlinVersion = libs.versions.kotlin.get()
+    val kotlinVersion = libs.versions.runtime.kotlin.get()
     inputs.property("apparmorxVersion", pluginVersion)
     inputs.property("kotlinVersion", kotlinVersion)
     filesMatching("apparmorx-version.properties") { expand("version" to pluginVersion, "kotlin" to kotlinVersion) }

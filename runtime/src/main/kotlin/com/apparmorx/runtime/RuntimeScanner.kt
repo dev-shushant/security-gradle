@@ -45,7 +45,8 @@ internal object RuntimeScanner {
 
 
     fun fastPreflight(context: Context): SecuritySnapshot {
-        val evidence = mutableListOf<Evidence>()
+        // A successful lightweight pass is not a completed full scan.
+        val evidence = mutableListOf(Evidence("scan-pending", Status.UNAVAILABLE))
         var sequence = 0L
         var enforcement = EnforcementPolicy.DEFAULT
         try {
@@ -56,7 +57,7 @@ internal object RuntimeScanner {
             }
             sequence = properties.getProperty("sequence", "0").toLong()
             enforcement = parseEnforcementPolicy(properties)
-            evidence += probe("application-id") { context.packageName != properties.getProperty("applicationId") }
+            evidence += applicationIdentityEvidence(context.packageName, properties.getProperty("applicationId"))
         } catch (_: Exception) {}
         evidence += probe("debugger") { Debug.isDebuggerConnected() || Debug.waitingForDebugger() }
         evidence += probe("debuggable-app") { context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0 }
@@ -75,13 +76,16 @@ internal object RuntimeScanner {
         val evidence = mutableListOf<Evidence>()
         var sequence = 0L
         var enforcement = EnforcementPolicy.DEFAULT
-        var payloadDigests = emptyMap<String, String>()
+        var payloadDigests: Map<String, String>? = null
         try {
             val properties = Properties()
             context.assets.open("apparmorx/policy.properties").use { input ->
                 val bytes = readBounded(input, MAX_POLICY_BYTES)
                 properties.load(bytes.inputStream())
             }
+            // Preserve a valid response even when independent scan configuration is malformed.
+            val configuration = parseScanConfiguration(properties)
+            enforcement = configuration.enforcement
             require(properties.getProperty("schema") == "1")
             sequence = properties.getProperty("sequence").toLong()
             val expires = properties.getProperty("expires").toLong()
@@ -89,19 +93,10 @@ internal object RuntimeScanner {
             require(markers.size in 1..128 && markers.all { it.matches(Regex("[a-z0-9._-]{4,80}")) })
             val certificates = properties.getProperty("certificates").split(',').filter { it.isNotBlank() }.toSet()
             require(certificates.all { it.matches(Regex("[0-9a-f]{64}")) })
-            val rawDigests = properties.getProperty("payloadDigests", "").trim()
-            if (rawDigests.isNotBlank()) {
-                payloadDigests = rawDigests.split(',')
-                    .filter { it.contains(':') }
-                    .associate {
-                        val parts = it.split(':', limit = 2)
-                        parts[0].trim() to parts[1].trim()
-                    }
-            }
-            // Invalid response configuration invalidates policy evidence; never report it as CLEAR.
-            enforcement = parseEnforcementPolicy(properties)
-            evidence += Evidence("policy", if (expires == 0L || expires > System.currentTimeMillis() / 1000) Status.CLEAR else Status.UNAVAILABLE)
-            evidence += probe("application-id") { context.packageName != properties.getProperty("applicationId") }
+            payloadDigests = configuration.payloadDigests
+            // Bad pins invalidate policy/integrity evidence, without suppressing signer/hook checks.
+            evidence += configuration.policyEvidence(context.packageName, expires, System.currentTimeMillis() / 1000)
+            evidence += applicationIdentityEvidence(context.packageName, properties.getProperty("applicationId"))
             evidence += probe("hook-library") {
                 File("/proc/self/maps").inputStream().use { stream ->
                     matchesIndicator(readBounded(stream, MAX_MAP_BYTES).toString(Charsets.UTF_8), markers)
@@ -115,17 +110,14 @@ internal object RuntimeScanner {
         evidence += probe("debugger") { Debug.isDebuggerConnected() || Debug.waitingForDebugger() }
         evidence += probe("debuggable-app") { context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0 }
         evidence += Evidence("root-path", rootPathStatus(ROOT_PATHS, ::statPathCheck))
-        evidence += probe("apk-integrity") {
-            val apk = File(context.packageCodePath)
-            !ApkIntegrityVerifier.verify(apk, payloadDigests)
-        }
+        evidence += payloadIntegrityEvidence(File(context.packageCodePath), payloadDigests)
         evidence += probe("hook-classes") { hasHookClass(context.classLoader, HOOK_FRAMEWORK_CLASSES) }
         evidence += probe("build-tags") { Build.TAGS?.contains("test-keys") == true }
         evidence += probe("network-cleartext-permitted") {
             NetworkSecurityPolicy.getInstance().isCleartextTrafficPermitted
         }
-        evidence += probe("environment-hardware") {
-            isEmulatorFingerprint(
+        evidence += Evidence("environment-hardware",
+            emulatorFingerprintStatus(
                 Build.FINGERPRINT.orEmpty(),
                 Build.MODEL.orEmpty(),
                 Build.BRAND.orEmpty(),
@@ -133,7 +125,7 @@ internal object RuntimeScanner {
                 Build.PRODUCT.orEmpty(),
                 Build.HARDWARE.orEmpty()
             )
-        }
+        )
         evidence += probe("virtual-space") {
             val filesDir = context.filesDir?.absolutePath.orEmpty()
             filesDir.isNotEmpty() && isVirtualSpacePath(filesDir, context.packageName)

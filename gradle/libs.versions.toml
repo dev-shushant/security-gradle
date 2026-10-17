@@ -1,6 +1,7 @@
 [versions]
-asm = "9.11"
+asm = "9.11.1"
 kotlin = "2.4.10"
+runtime-kotlin = "2.2.21"
 gradle = "9.4.1"
 junit = "4.13.2"
 

@@ -141,4 +141,35 @@ class ApkIntegrityVerifierTest {
             }
         }
     }
+    private fun duplicateName(file: java.io.File, alias: String, target: String): java.io.File {
+        val from=alias.toByteArray();val to=target.toByteArray();require(from.size==to.size)
+        val bytes=file.readBytes();var replacements=0
+        for(i in 0..bytes.size-from.size) {
+            if(from.indices.all { bytes[i+it]==from[it] }) { to.copyInto(bytes,i);replacements++ }
+        }
+        assertEquals("Both ZIP headers must be rewritten",2,replacements)
+        file.writeBytes(bytes)
+        java.util.zip.ZipFile(file).use { zip -> assertEquals(2,zip.entries().asSequence().count { it.name==target }) }
+        return file
+    }
+
+    private fun cleanArchiveEntries() = linkedMapOf(
+        "classes.dex" to ApkIntegrityVerifier.createSyntheticDex("AppArmorX structural control".toByteArray()),
+        "AndroidManifest.xml" to "<manifest/>".toByteArray(),
+        "assets/apparmorx/policy.properties" to "schema=1\n".toByteArray(),
+        "lib/arm64-v8a/libapparmorx.so" to (byteArrayOf(0x7f, 'E'.code.toByte(), 'L'.code.toByte(), 'F'.code.toByte()) + ByteArray(12)))
+    @Test fun duplicateFilesAreRejectedEvenWhenBothPayloadsAreValid() {
+        for(path in cleanArchiveEntries().keys) {
+            val alias=path.dropLast(1)+(if(path.last()=='x') "y" else "x")
+            val entries=cleanArchiveEntries();entries[alias]=requireNotNull(entries[path])
+            val file=tempFolder.newFile();createZip(file,entries);duplicateName(file,alias,path)
+            assertFalse("Duplicate $path passed structural verification",ApkIntegrityVerifier.verify(file))
+        }
+    }
+    @Test fun repeatedDirectoryMetadataIsNotTreatedAsTamperedPayload() {
+        val entries=cleanArchiveEntries();entries["assets/demo/"]=byteArrayOf();entries["assets/demx/"]=byteArrayOf()
+        val file=tempFolder.newFile();createZip(file,entries);duplicateName(file,"assets/demx/","assets/demo/")
+        assertTrue(ApkIntegrityVerifier.verify(file))
+    }
+
 }

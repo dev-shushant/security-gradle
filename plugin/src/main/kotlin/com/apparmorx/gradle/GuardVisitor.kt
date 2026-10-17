@@ -49,12 +49,16 @@ private val COMPONENT_CONFIGS = mapOf(
     ComponentType.SERVICE to ComponentConfig(
         defaultSuperName = "android/app/Service",
         lifecycle = mapOf(
-            "onCreate" to "()V"
+            "onCreate" to "()V",
+            "onStartCommand" to "(Landroid/content/Intent;II)I",
+            "onBind" to "(Landroid/content/Intent;)Landroid/os/IBinder;",
+            "onRebind" to "(Landroid/content/Intent;)V",
+            "onStart" to "(Landroid/content/Intent;I)V"
         ),
         guardMethod = "allowService",
         guardDescriptor = "(Landroid/app/Service;)Z",
         canSynthesize = true,
-        injectAtMethodStart = false
+        injectAtMethodStart = true
     ),
     ComponentType.RECEIVER to ComponentConfig(
         defaultSuperName = "android/content/BroadcastReceiver",
@@ -110,7 +114,7 @@ class GuardVisitor(
         var delegate = super.visitMethod(access, name, descriptor, signature, exceptions)
         if (config != null && config.lifecycle[name] == descriptor) {
             presentLifecycle += name
-            delegate = GuardInjectingMethodVisitor(delegate, superName, name, componentType!!, config)
+            delegate = GuardInjectingMethodVisitor(delegate, superName, name, descriptor, componentType!!, config)
         }
         return FirewallMethodVisitor(delegate)
     }
@@ -118,15 +122,21 @@ class GuardVisitor(
     override fun visitEnd() {
         if (config != null && config.canSynthesize) {
             for ((name, descriptor) in config.lifecycle) {
-                if (name !in presentLifecycle) synthesizeGuardedOverride(name, descriptor)
+                // Never synthesize abstract onBind. For inherited Service callbacks, direct
+                // framework parents are safe; a library parent may define a final callback.
+                val serviceCallbackCanBeSynthesized = componentType != ComponentType.SERVICE ||
+                    (name != "onBind" && superName == "android/app/Service")
+                if (name !in presentLifecycle && serviceCallbackCanBeSynthesized) synthesizeGuardedOverride(name, descriptor)
             }
         }
         super.visitEnd()
     }
 
     private fun synthesizeGuardedOverride(name: String, descriptor: String) {
-        val method = super.visitMethod(Opcodes.ACC_PROTECTED, name, descriptor, null, null)
+        val access = if (componentType == ComponentType.ACTIVITY) Opcodes.ACC_PROTECTED else Opcodes.ACC_PUBLIC
+        val method = super.visitMethod(access, name, descriptor, null, null)
         method.visitCode()
+        if (config!!.injectAtMethodStart) emitGuardCall(method, componentType!!, name, descriptor)
         method.visitVarInsn(Opcodes.ALOAD, 0)
         var slot = 1
         for (type in org.objectweb.asm.Type.getArgumentTypes(descriptor)) {
@@ -134,8 +144,8 @@ class GuardVisitor(
             slot += type.size
         }
         method.visitMethodInsn(Opcodes.INVOKESPECIAL, superName, name, descriptor, false)
-        emitGuardCall(method, componentType!!)
-        method.visitInsn(Opcodes.RETURN)
+        if (!config.injectAtMethodStart) emitGuardCall(method, componentType!!, name, descriptor)
+        method.visitInsn(org.objectweb.asm.Type.getReturnType(descriptor).getOpcode(Opcodes.IRETURN))
         method.visitMaxs(0, 0)
         method.visitEnd()
     }
@@ -145,6 +155,7 @@ private class GuardInjectingMethodVisitor(
     next: MethodVisitor,
     private val superName: String,
     private val methodName: String,
+    private val methodDescriptor: String,
     private val componentType: ComponentType,
     private val config: ComponentConfig,
 ) : MethodVisitor(Opcodes.ASM9, next) {
@@ -154,7 +165,7 @@ private class GuardInjectingMethodVisitor(
         super.visitCode()
         if (!injected && config.injectAtMethodStart) {
             injected = true
-            emitGuardCall(this, componentType)
+            emitGuardCall(this, componentType, methodName, methodDescriptor)
         }
     }
 
@@ -162,12 +173,12 @@ private class GuardInjectingMethodVisitor(
         super.visitMethodInsn(opcode, owner, name, descriptor, isInterface)
         if (!injected && !config.injectAtMethodStart && opcode == Opcodes.INVOKESPECIAL && owner == superName && name == methodName) {
             injected = true
-            emitGuardCall(this, componentType)
+            emitGuardCall(this, componentType, methodName, methodDescriptor)
         }
     }
 }
 
-private fun emitGuardCall(method: MethodVisitor, type: ComponentType) {
+private fun emitGuardCall(method: MethodVisitor, type: ComponentType, methodName: String, descriptor: String) {
     val config = COMPONENT_CONFIGS.getValue(type)
     if (type == ComponentType.RECEIVER) {
         method.visitVarInsn(Opcodes.ALOAD, 1) // context argument in onReceive(Context, Intent)
@@ -177,7 +188,20 @@ private fun emitGuardCall(method: MethodVisitor, type: ComponentType) {
     method.visitMethodInsn(Opcodes.INVOKESTATIC, GUARD_OWNER, config.guardMethod, config.guardDescriptor, false)
     val continueLabel = Label()
     method.visitJumpInsn(Opcodes.IFNE, continueLabel)
-    method.visitInsn(Opcodes.RETURN)
+    when (org.objectweb.asm.Type.getReturnType(descriptor).sort) {
+        org.objectweb.asm.Type.VOID -> method.visitInsn(Opcodes.RETURN)
+        org.objectweb.asm.Type.INT -> {
+            require(type == ComponentType.SERVICE && methodName == "onStartCommand")
+            method.visitInsn(Opcodes.ICONST_2) // Service.START_NOT_STICKY; avoid a sticky restart loop.
+            method.visitInsn(Opcodes.IRETURN)
+        }
+        org.objectweb.asm.Type.OBJECT -> {
+            require(type == ComponentType.SERVICE && methodName == "onBind")
+            method.visitInsn(Opcodes.ACONST_NULL)
+            method.visitInsn(Opcodes.ARETURN)
+        }
+        else -> error("Unsupported guarded callback return type")
+    }
     method.visitLabel(continueLabel)
 }
 

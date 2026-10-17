@@ -1,3 +1,5 @@
+@file:Suppress("UnstableApiUsage")
+
 pluginManagement { repositories { google(); gradlePluginPortal(); mavenCentral() } }
 plugins {
     // Provisions the JDKs named in gradle/gradle-daemon-jvm.properties and jvmToolchain(17) on machines
@@ -7,3 +9,5 @@ plugins {
 dependencyResolutionManagement { repositories { google(); mavenCentral() } }
 rootProject.name = "security-gradle"
 include(":policy", ":plugin", ":runtime")
+
+include(":platform-core")

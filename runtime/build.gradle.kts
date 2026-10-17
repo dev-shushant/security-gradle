@@ -1,4 +1,11 @@
 plugins { id("com.android.library"); `maven-publish` }
+kotlin {
+    compilerOptions {
+        // Public runtime metadata must remain readable by AGP's default Kotlin compiler.
+        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_2)
+        apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_2)
+    }
+}
 android {
     namespace = "com.apparmorx.runtime"
     compileSdk = 34
@@ -9,7 +16,10 @@ android {
     testOptions { unitTests { isReturnDefaultValues = true } }
     publishing { singleVariant("release") { withSourcesJar() } }
 }
-dependencies { testImplementation(libs.junit) }
+dependencies {
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:${libs.versions.runtime.kotlin.get()}")
+    testImplementation(libs.junit)
+}
 afterEvaluate {
     publishing {
         publications {

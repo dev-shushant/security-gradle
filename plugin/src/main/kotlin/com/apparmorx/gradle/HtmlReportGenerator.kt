@@ -49,7 +49,7 @@ object HtmlReportGenerator {
         sb.append("<header><div class=\"brand\">AppArmorX</div><div class=\"sub\">Build security report &middot; ")
         sb.append("${esc(input.variant)} &middot; profile ${esc(input.profile)}</div></header>")
         sb.append("<section class=\"verdict ${if (verified) "ok" else "bad"}\"><div class=\"big\">")
-        sb.append(if (verified) "PROTECTION VERIFIED" else "PROTECTION INCOMPLETE")
+        sb.append(if (verified) "PACKAGED CHECKS PASSED" else "PACKAGED CHECKS INCOMPLETE")
         sb.append("</div><div>${esc(r.archiveName)} &middot; ABIs: ")
         sb.append(if (r.abis.isEmpty()) "none" else r.abis.joinToString(", ") { esc(it) })
         sb.append(" &middot; $enabledCount of ${LAYERS.size} protection layers enabled</div>")
@@ -57,6 +57,23 @@ object HtmlReportGenerator {
             sb.append("<ul>").append(r.failures.joinToString("") { "<li><code>${esc(it)}</code></li>" }).append("</ul>")
         }
         sb.append("</section>")
+        sb.append("<p class=\"muted\">This verdict covers packaged artifacts and manifest findings; executable component guards are not verified by this inventory.</p>")
+
+        sb.append("<h2>Component declarations and guard boundaries</h2>")
+        val inventory = r.componentInventory
+        if (inventory == null) sb.append("<p class=\"warning\">Component inventory unavailable.</p>")
+        else {
+            for (issue in inventory.issues) sb.append("<p class=\"warning\">${esc(issue)}</p>")
+            sb.append("<table><tr><th>Kind</th><th>Component / target</th><th>Process</th><th>Coverage status</th></tr>")
+            for (c in inventory.components) {
+                sb.append("<tr><td>${esc(c.kind)}</td><td><code>${esc(c.name)}</code>")
+                c.target?.let { sb.append("<br>Target: <code>${esc(it)}</code>") }
+                sb.append("</td><td>${esc(c.process)}</td><td>${esc(c.coverage)}</td></tr>")
+            }
+            sb.append("</table><ul class=\"muted\">")
+            for (limit in ComponentInventory.LIMITS) sb.append("<li>${esc(limit)}</li>")
+            sb.append("</ul>")
+        }
 
         sb.append("<h2>Protection layers</h2><div class=\"grid\">")
         for (layer in LAYERS) {
@@ -76,7 +93,9 @@ object HtmlReportGenerator {
 
         sb.append("<h2>Manifest audit</h2>")
         if (input.findings.isEmpty()) {
-            sb.append("<p class=\"muted\">No manifest findings.</p>")
+            sb.append(if (inventory == null || inventory.issues.isNotEmpty())
+                "<p class=\"warning\">Manifest completeness is unverified; no findings alone is not a clean-manifest verdict.</p>"
+                else "<p class=\"muted\">No manifest findings.</p>")
         } else {
             sb.append("<table><tr><th>Severity</th><th>Rule</th><th>Finding</th></tr>")
             for (f in input.findings) {

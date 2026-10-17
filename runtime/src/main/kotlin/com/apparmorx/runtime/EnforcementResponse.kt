@@ -1,7 +1,6 @@
 package com.apparmorx.runtime
 
 import android.app.Activity
-import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.os.Process
 import android.util.Log
@@ -35,14 +34,19 @@ internal object EnforcementResponse {
             Process.killProcess(Process.myPid())
             return false
         }
-        return when (resolveEnforcementAction(state, policy)) {
+        return when (resolveEnforcementAction(state, policy, debuggable)) {
             EnforcementAction.OBSERVE -> true
             EnforcementAction.WARN -> {
                 Log.w(TAG, "Guarded activity ${activity.javaClass.name} observed protection state $state")
                 true
             }
             EnforcementAction.BLOCK_SCREEN -> {
-                activity.startActivity(Intent(activity, SecurityBlockActivity::class.java))
+                val destination = if (state == ProtectionState.CHECKING) {
+                    runCatching { StartupLaunches.prepare(activity) }.getOrElse {
+                        SecurityUiDestination.forState(activity, state)
+                    }
+                } else SecurityUiDestination.forState(activity, state)
+                activity.startActivity(destination)
                 activity.finish()
                 false
             }

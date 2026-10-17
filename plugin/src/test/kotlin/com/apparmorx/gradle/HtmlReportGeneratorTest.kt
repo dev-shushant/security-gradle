@@ -23,7 +23,8 @@ class HtmlReportGeneratorTest {
 
     @Test fun protectedBuildShowsVerdictLayersAndHonestLimits() {
         val html = HtmlReportGenerator.render(base)
-        assertTrue(html.contains("PROTECTION VERIFIED"))
+        assertTrue(html.contains("PACKAGED CHECKS PASSED"))
+        assertTrue(html.contains("Component inventory unavailable"))
         assertTrue(html.contains("Dependency firewall"))
         assertTrue(html.contains("arm64-v8a"))
         assertTrue(html.contains("not unbypassable") || html.contains("Not unbypassable"))
@@ -32,9 +33,9 @@ class HtmlReportGeneratorTest {
     @Test fun failedCoverageIsNeverShownAsVerified() {
         val failed = base.copy(report = base.report.copy(isProtected = false, failures = listOf("missing-native-engine")))
         val html = HtmlReportGenerator.render(failed)
-        assertTrue(html.contains("PROTECTION INCOMPLETE"))
+        assertTrue(html.contains("PACKAGED CHECKS INCOMPLETE"))
         assertTrue(html.contains("missing-native-engine"))
-        assertFalse(html.contains("PROTECTION VERIFIED"))
+        assertFalse(html.contains("PACKAGED CHECKS PASSED"))
     }
 
     @Test fun weakenedOverridesAreHighlighted() {
@@ -54,5 +55,16 @@ class HtmlReportGeneratorTest {
         assertFalse(html.contains("<script>alert(1)"))
         assertFalse(html.contains("<img src=x"))
         assertTrue(html.contains("&lt;script&gt;"))
+    }
+
+    @Test fun componentDeclarationsAreEscapedAndDoNotImplyBytecodeCoverage() {
+        val inventory = ComponentInventory(listOf(ManifestComponent("provider", "<script>bad</script>",
+            ":worker", "true", null, "NOT_LIFECYCLE_GUARDED")), emptyList())
+        val html = HtmlReportGenerator.render(base.copy(report = base.report.copy(componentInventory = inventory)))
+        assertFalse(html.contains("<script>bad"))
+        assertTrue(html.contains("&lt;script&gt;bad"))
+        assertTrue(html.contains("NOT_LIFECYCLE_GUARDED"))
+        assertTrue(html.contains("Workers are not enumerated"))
+        assertTrue(html.contains("executable component guards are not verified"))
     }
 }

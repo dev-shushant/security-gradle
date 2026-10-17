@@ -13,3 +13,14 @@ local.properties
 firebase-debug.log
 /.idea/
 /.claude/
+/scripts/*
+!/scripts/start-test-emulator.py
+!/scripts/verify-process-death.py
+!/scripts/verify-cold-start.py
+!/scripts/verify-delivered-splits.py
+!/scripts/benchmark-protection.py
+!/scripts/soak-protection.py
+!/scripts/remote_worker_dex.py
+!/scripts/verify-remote-consumer-device.py
+!/scripts/verify-archive-canonical.py
+/docs/

@@ -32,12 +32,16 @@ object SecurityRuntime {
     private val initialized = AtomicBoolean(false)
     private val scanning = AtomicBoolean(false)
     private val executor = Executors.newSingleThreadExecutor { runnable -> Thread(runnable, "AppArmorX-scan").apply { isDaemon = true } }
+    @Volatile private var completedScans = 0L
     @Volatile private var current = SecuritySnapshot(0, 0, emptyList())
     @Volatile private var application: Context? = null
     @Volatile private var lastScanElapsed = -MIN_SCAN_INTERVAL_MS
 
-    /** @return most recently completed evidence; checkedAtMillis=0 means pending/uninitialized. */
+    /** Latest evidence; scan-pending marks partial preflight, checkedAtMillis=0 marks uninitialized. */
     fun snapshot(): SecuritySnapshot = current
+
+    /** Published only after a full scan result and its throttle timestamp are visible. */
+    internal fun completedScanRevision(): Long = completedScans
 
     private fun isDebuggableBuild(context: Context): Boolean = try {
         context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
@@ -58,6 +62,7 @@ object SecurityRuntime {
             try {
                 current = RuntimeScanner.scan(context)
                 lastScanElapsed = SystemClock.elapsedRealtime()
+                completedScans++
                 TelemetryDispatcher.dispatchIfDetected(context, current)
                 main.post {
                     resumed.toList().forEach { activity ->
@@ -140,8 +145,10 @@ object SecurityRuntime {
     }
 
     /**
-     * Synchronizes security posture from the primary process if running in a secondary process.
-     * Prevents scanning storms and ensures unified security enforcement.
+     * Best-effort provider hint query; multiprocess providers may reply from a local clone.
+     * The historical method name does not guarantee a primary-process reply.
+     * It does not import evidence or a verdict, suppress
+     * local scanning, or authorize any component. A true result only means a reply was received.
      */
     fun syncFromPrimaryProcess(context: Context): Boolean {
         val processName = currentProcessName(context)

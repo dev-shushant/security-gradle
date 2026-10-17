@@ -104,9 +104,7 @@ abstract class PrepareSecurityPolicy : DefaultTask() {
             appendLine("firewallNetworkSecurity=${firewallNetworkSecurity.get()}")
             appendLine("antiPtraceHardening=${antiPtraceHardening.get()}")
             appendLine("killOnConfirmedHooking=${killOnConfirmedHooking.get()}")
-            val digests = payloadDigests.get()
-            require(digests.values.all { it.matches(Regex("[0-9a-fA-F]{64}")) }) { "Payload digests must be SHA-256 hex" }
-            val serializedDigests = digests.entries.joinToString(",") { "${it.key}:${it.value}" }
+            val serializedDigests = serializePayloadDigestPins(payloadDigests.get())
             appendLine("payloadDigests=$serializedDigests")
         }
         val directory = outputDirectory.get().asFile.toPath().resolve("apparmorx")

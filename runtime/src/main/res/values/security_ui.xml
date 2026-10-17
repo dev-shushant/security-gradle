@@ -1,0 +1,11 @@
+<resources>
+    <string name="apparmorx_security_checking">Checking app security…</string>
+    <string name="apparmorx_security_restricted">This app cannot continue because a required security check did not pass.</string>
+    <string name="apparmorx_security_unavailable_retry">The app couldn\'t complete a required security check. You can check again or close the app.</string>
+    <string name="apparmorx_security_unavailable_reopen">The app couldn\'t complete a required security check. Please close and reopen the app.</string>
+    <string name="apparmorx_security_retry">Check again</string>
+    <string name="apparmorx_security_close">Close app</string>
+    <string name="apparmorx_security_restart_required">The app could not initialize safely. Close it, then force stop and reopen it from Android settings before trying again.</string>
+    <color name="apparmorx_security_background">#101216</color>
+    <color name="apparmorx_security_text">#F3F4F6</color>
+</resources>

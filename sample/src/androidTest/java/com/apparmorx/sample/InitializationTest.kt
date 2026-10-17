@@ -22,7 +22,7 @@ import org.junit.runner.RunWith
 class InitializationTest {
     @Test fun automaticProviderInitializationDoesNotSilentlyClaimClean() {
         val deadline = System.nanoTime() + 10_000_000_000L
-        while (SecurityRuntime.snapshot().checkedAtMillis == 0L && System.nanoTime() < deadline) {
+        while (SecurityRuntime.snapshot().evidence.none { it.check == "native-engine" } && System.nanoTime() < deadline) {
             Thread.sleep(50)
         }
         val snapshot = SecurityRuntime.snapshot()
@@ -102,7 +102,7 @@ class InitializationTest {
 
     @Test fun launchingUnmodifiedActivityFiresInjectedGuard() {
         val scanDeadline = System.nanoTime() + 10_000_000_000L
-        while (SecurityRuntime.snapshot().checkedAtMillis == 0L && System.nanoTime() < scanDeadline) {
+        while (SecurityRuntime.snapshot().evidence.none { it.check == "native-engine" } && System.nanoTime() < scanDeadline) {
             Thread.sleep(50)
         }
         assertTrue("Initial scan completed", SecurityRuntime.snapshot().checkedAtMillis > 0)
@@ -128,7 +128,7 @@ class InitializationTest {
                 activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             }
             val initialDeadline = System.nanoTime() + 10_000_000_000L
-            while (SecurityRuntime.snapshot().checkedAtMillis == 0L && System.nanoTime() < initialDeadline) {
+            while (SecurityRuntime.snapshot().evidence.none { it.check == "native-engine" } && System.nanoTime() < initialDeadline) {
                 Thread.sleep(50)
             }
             val initial = SecurityRuntime.snapshot().checkedAtMillis

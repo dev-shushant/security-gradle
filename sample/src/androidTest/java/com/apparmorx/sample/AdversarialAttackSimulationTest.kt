@@ -93,8 +93,8 @@ class AdversarialAttackSimulationTest {
     fun simulatedRestrictedEnforcementActionStopsHeadlessService() {
         val service = SampleBackgroundService().apply { attachForTesting(context) }
         val proceed = SecurityGuard.allowService(service)
-        // Under active MIRAGE policy, service is allowed to execute with micro-latency jitter
-        assertTrue("Under MIRAGE policy, allowService proceeds with Mirage delays", proceed)
+        // Debug builds must stay observe-only even when release configuration requests MIRAGE.
+        assertTrue("Debug guard must allow the service without blocking", proceed)
     }
 
     @Test

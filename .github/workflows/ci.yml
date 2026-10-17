@@ -51,7 +51,7 @@ jobs:
           set -euo pipefail
           SDKMANAGER="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
           yes | "$SDKMANAGER" --licenses > /dev/null || true
-          "$SDKMANAGER" "platforms;${PLATFORM}" "platforms;android-34" "ndk;${NDK_VERSION}" "cmake;${CMAKE_VERSION}" > /dev/null
+          "$SDKMANAGER" "platforms;${PLATFORM}" "platforms;android-34" "platforms;android-36" "ndk;${NDK_VERSION}" "cmake;${CMAKE_VERSION}" > /dev/null
           echo "sdk.dir=${ANDROID_HOME}" > local.properties
 
       - name: Make wrapper executable
@@ -74,7 +74,34 @@ jobs:
         run: ./gradlew :plugin:publishAllPublicationsToCandidateRepository -PreleaseVersion=0.1.1-SNAPSHOT -Papparmorx.candidateRepository="$RUNNER_TEMP/candidate-repository" --configuration-cache
 
       - name: Verify candidate external-JAR firewall in signed R8 output
-        run: python3 scripts/verify-public-consumer.py --version 0.1.1-SNAPSHOT --repository "$RUNNER_TEMP/candidate-repository" --work-dir "$RUNNER_TEMP/candidate-consumer" --verify-dependency
+        run: python3 scripts/verify-public-consumer.py --version 0.1.1-SNAPSHOT --repository "$RUNNER_TEMP/candidate-repository" --work-dir "$RUNNER_TEMP/candidate-consumer" --verify-dependency --bundle --require-bundle-audit --verify-service-callbacks --verify-report-boundaries --verify-provider-operations --verify-inherited-provider
+
+      - name: Verify ordinary Kotlin worker consumer compatibility and R8 guards
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import subprocess
+          cache = Path(os.environ.get('GRADLE_USER_HOME', str(Path.home() / '.gradle'))) / 'caches/modules-2/files-2.1'
+          def artifact(pattern):
+              matches = list(cache.glob(pattern))
+              if len(matches) != 1:
+                  raise SystemExit('Expected one resolved compile API: ' + pattern)
+              return str(matches[0])
+          temporary = Path(os.environ['RUNNER_TEMP'])
+          subprocess.run(['python3', 'scripts/verify-public-consumer.py',
+              '--version', '0.1.1-SNAPSHOT', '--repository', str(temporary / 'candidate-repository'),
+              '--work-dir', str(temporary / 'worker-consumer'),
+              '--gradle-user-home', str(cache.parents[2]),
+              '--verify-worker-entries', '--verify-coroutine-worker', '--verify-remote-worker',
+              '--worker-runtime-aar', artifact('androidx.work/work-runtime/2.11.1/*/work-runtime-2.11.1.aar'),
+              '--worker-compile-jar', artifact('com.google.guava/listenablefuture/1.0/*/listenablefuture-1.0.jar'),
+              '--bundle', '--require-bundle-audit'], check=True)
+          PY
+
+      - name: Verify duplicate-file and primary-DEX archive regressions
+        run: |
+          python3 scripts/verify-archive-canonical.py --apk "$RUNNER_TEMP/worker-consumer/build/outputs/apk/release/apparmorx-public-consumer-release.apk" --aab "$RUNNER_TEMP/worker-consumer/build/outputs/bundle/release/apparmorx-public-consumer-release.aab" --output "$RUNNER_TEMP/archive-canonical"
 
       - name: Upload reports
         if: always()
@@ -89,7 +116,14 @@ jobs:
             plugin/build/test-results/
             ${{ runner.temp }}/candidate-consumer/build-*.log
             ${{ runner.temp }}/candidate-consumer/build/reports/apparmorx/
-            ${{ runner.temp }}/candidate-consumer/disassembly.txt
+            ${{ runner.temp }}/candidate-consumer/disassembly-*.txt
+            ${{ runner.temp }}/candidate-consumer/*signature-verification.log
+            ${{ runner.temp }}/worker-consumer/build-*.log
+            ${{ runner.temp }}/worker-consumer/build/reports/apparmorx/
+            ${{ runner.temp }}/worker-consumer/disassembly-*.txt
+            ${{ runner.temp }}/worker-consumer/remote-r8-summary.json
+            ${{ runner.temp }}/archive-canonical/summary.json
+            ${{ runner.temp }}/archive-canonical/probe.log
 
   # "Device farm": runs the sample's instrumented tests on emulators across API levels.
   # x86_64 emulators on a Linux runner, hardware-accelerated through KVM.
@@ -161,7 +195,44 @@ jobs:
           # headless (-no-window) launch; everything else matches what reactivecircus defaults to.
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics -camera-back none
           working-directory: sample
-          script: ../gradlew connectedDebugAndroidTest --configuration-cache --stacktrace
+          emulator-port: 5554
+          script: |
+            ../gradlew connectedDebugAndroidTest --configuration-cache --stacktrace
+            python3 ../scripts/verify-service-callbacks.py --device emulator-5554 --output "$RUNNER_TEMP/service-callbacks"
+            python3 ../scripts/verify-service-callbacks.py --suite security-ui --device emulator-5554 --output "$RUNNER_TEMP/security-ui"
+            python3 ../scripts/verify-service-callbacks.py --suite startup-recovery --device emulator-5554 --output "$RUNNER_TEMP/startup-recovery"
+            python3 ../scripts/verify-service-callbacks.py --suite scan-config --device emulator-5554 --output "$RUNNER_TEMP/scan-config"
+            python3 ../scripts/verify-service-callbacks.py --suite provider --device emulator-5554 --output "$RUNNER_TEMP/provider-operations"
+            python3 ../scripts/verify-service-callbacks.py --suite worker --device emulator-5554 --output "$RUNNER_TEMP/worker-entries"
+            python3 ../scripts/verify-service-callbacks.py --suite multiprocess --device emulator-5554 --output "$RUNNER_TEMP/multiprocess-binding"
+            python3 ../scripts/verify-service-callbacks.py --suite remote-worker --device emulator-5554 --output "$RUNNER_TEMP/remote-workers"
+            python3 ../scripts/verify-process-death.py --device emulator-5554 --output "$RUNNER_TEMP/process-death"
+            python3 ../scripts/verify-cold-start.py --device emulator-5554 --output "$RUNNER_TEMP/cold-start"
+            ../gradlew -p .. :plugin:publishAllPublicationsToCandidateRepository -PreleaseVersion=0.1.1-SNAPSHOT -Papparmorx.candidateRepository="$RUNNER_TEMP/split-candidate-repository" --configuration-cache
+            python3 - <<'PYREMOTE'
+            import os, subprocess
+            from pathlib import Path
+            cache = Path.home() / '.gradle/caches/modules-2/files-2.1'
+            def api(pattern):
+                paths = list(cache.glob(pattern))
+                if len(paths) != 1:
+                    raise SystemExit('Expected one remote-consumer compile API: ' + pattern)
+                return str(paths[0])
+            temporary = Path(os.environ['RUNNER_TEMP'])
+            subprocess.run(['python3', '../scripts/verify-public-consumer.py',
+                '--version', '0.1.1-SNAPSHOT', '--repository', str(temporary / 'split-candidate-repository'),
+                '--application-id', 'com.apparmorx.consumer.remotelifecycle',
+                '--work-dir', str(temporary / 'remote-device-consumer'), '--gradle-user-home', str(Path.home() / '.gradle'),
+                '--verify-worker-entries', '--verify-coroutine-worker', '--verify-remote-worker', '--remote-device-controls',
+                '--worker-runtime-aar', api('androidx.work/work-runtime/2.11.1/*/work-runtime-2.11.1.aar'),
+                '--worker-compile-jar', api('com.google.guava/listenablefuture/1.0/*/listenablefuture-1.0.jar'),
+                '--bundle', '--require-bundle-audit'], check=True)
+            PYREMOTE
+            python3 ../scripts/verify-remote-consumer-device.py --device emulator-5554 --apk "$RUNNER_TEMP/remote-device-consumer/build/outputs/apk/release/apparmorx-public-consumer-release.apk" --output "$RUNNER_TEMP/remote-consumer-device"
+            python3 ../scripts/verify-public-consumer.py --version 0.1.1-SNAPSHOT --application-id com.apparmorx.consumer.splitdelivery --repository "$RUNNER_TEMP/split-candidate-repository" --work-dir "$RUNNER_TEMP/split-consumer" --gradle-user-home "$HOME/.gradle" --verify-dependency --verify-service-callbacks --verify-report-boundaries --verify-provider-operations --verify-inherited-provider --bundle --require-bundle-audit
+            curl --fail --location https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar --output "$RUNNER_TEMP/bundletool.jar"
+            echo "a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29  $RUNNER_TEMP/bundletool.jar" | sha256sum --check -
+            python3 ../scripts/verify-delivered-splits.py --device emulator-5554 --consumer "$RUNNER_TEMP/split-consumer" --bundletool "$RUNNER_TEMP/bundletool.jar" --output "$RUNNER_TEMP/delivered-splits"
 
       - name: Dump emulator log on failure
         if: failure()
@@ -184,6 +255,32 @@ jobs:
           path: |
             sample/build/reports/androidTests/
             sample/build/outputs/androidTest-results/
+            ${{ runner.temp }}/service-callbacks/summary.json
+            ${{ runner.temp }}/service-callbacks/*/*.log
+            ${{ runner.temp }}/security-ui/summary.json
+            ${{ runner.temp }}/security-ui/*/*.log
+            ${{ runner.temp }}/startup-recovery/summary.json
+            ${{ runner.temp }}/startup-recovery/*/*.log
+            ${{ runner.temp }}/scan-config/summary.json
+            ${{ runner.temp }}/scan-config/*/*.log
+            ${{ runner.temp }}/process-death/summary.json
+            ${{ runner.temp }}/process-death/*/*.log
+            ${{ runner.temp }}/cold-start/summary.json
+            ${{ runner.temp }}/cold-start/*/*.log
+            ${{ runner.temp }}/provider-operations/summary.json
+            ${{ runner.temp }}/provider-operations/*/*.log
+            ${{ runner.temp }}/worker-entries/summary.json
+            ${{ runner.temp }}/worker-entries/*/*.log
+            ${{ runner.temp }}/multiprocess-binding/summary.json
+            ${{ runner.temp }}/multiprocess-binding/*/*.log
+            ${{ runner.temp }}/remote-workers/summary.json
+            ${{ runner.temp }}/remote-workers/*/*.log
+            ${{ runner.temp }}/remote-device-consumer/build-*.log
+            ${{ runner.temp }}/remote-device-consumer/remote-r8-summary.json
+            ${{ runner.temp }}/remote-consumer-device/
+            ${{ runner.temp }}/delivered-splits/summary.json
+            ${{ runner.temp }}/delivered-splits/*.log
+            ${{ runner.temp }}/split-consumer/build-*.log
 
   public-consumer:
     name: Published plugin consumer (isolated)
@@ -200,8 +297,8 @@ jobs:
           packages: platform-tools
       - name: Install consumer SDK
         run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
-      - name: Verify public 0.1.1 installation, signed R8 build and cache reuse
-        run: python3 scripts/verify-public-consumer.py --verify-dependency --work-dir "$RUNNER_TEMP/public-consumer"
+      - name: Verify public 0.1.1 signed R8 APK/AAB and cache reuse
+        run: python3 scripts/verify-public-consumer.py --verify-dependency --bundle --work-dir "$RUNNER_TEMP/public-consumer"
       - name: Preserve consumer evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -210,4 +307,6 @@ jobs:
           if-no-files-found: ignore
           path: |
             ${{ runner.temp }}/public-consumer/build-*.log
+            ${{ runner.temp }}/public-consumer/*signature-verification.log
+            ${{ runner.temp }}/public-consumer/disassembly-*.txt
             ${{ runner.temp }}/public-consumer/build/reports/apparmorx/

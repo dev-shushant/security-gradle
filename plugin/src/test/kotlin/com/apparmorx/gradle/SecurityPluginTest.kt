@@ -31,7 +31,8 @@ class SecurityPluginTest {
     }
     @Test fun rejectsOfflineFeedWithoutPinnedFile() {
         fixture("security { policyUrl.set('https://apparmorx.com/policy') }")
-        assertTrue(runner("securityCheck", "--offline").buildAndFail().output.contains("signed policyFile is required"))
+        val failure = runner("securityCheck", "--offline").buildAndFail()
+        assertTrue(failure.output, failure.output.contains("signed policyFile is required"))
     }
     @Test fun rejectsNonHttpsFeedBeforeConnecting() {
         fixture("security { policyUrl.set('http://127.0.0.1/policy') }")

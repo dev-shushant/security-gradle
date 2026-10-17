@@ -41,13 +41,15 @@ abstract class VerifyProtectionCoverage : DefaultTask() {
     fun verify() {
         val apks = apkDirectory.asFileTree.matching { include("**/*.apk") }.files
         require(apks.isNotEmpty()) { "No packaged APK found to audit for AppArmorX protection coverage" }
-        val findings = if (mergedManifest.isPresent && mergedManifest.get().asFile.exists()) {
-            ManifestAuditor.audit(mergedManifest.get().asFile.readText(), debuggable.getOrElse(true))
+        val manifestXml = if (mergedManifest.isPresent && mergedManifest.get().asFile.exists()) mergedManifest.get().asFile.readText() else null
+        val inventory = componentInventory(manifestXml)
+        val findings = if (manifestXml != null) {
+            ManifestAuditor.audit(manifestXml, debuggable.getOrElse(true))
         } else {
             emptyList()
         }
         val findingStrings = findings.map { "${it.level}: [${it.code}] ${it.message}" }
-        val reports = apks.map { generateProtectionReport(it, manifestFindings = findingStrings) }
+        val reports = apks.map { generateProtectionReport(it, manifestFindings = findingStrings).copy(componentInventory = inventory) }
         if (reportFile.isPresent) {
             val file = reportFile.get().asFile
             file.parentFile?.mkdirs()
@@ -82,6 +84,6 @@ abstract class VerifyProtectionCoverage : DefaultTask() {
             "AppArmorX manifest security audit failed:\n" +
                 errorFindings.joinToString("\n") { "  [${it.code}] ${it.message}" }
         }
-        logger.lifecycle("AppArmorX: protection coverage verified for ${apks.size} packaged APK(s)")
+        logger.lifecycle("AppArmorX: packaged artifact checks passed for ${apks.size} APK(s); component guards require separate bytecode/runtime verification")
     }
 }

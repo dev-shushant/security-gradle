@@ -9,3 +9,4 @@ plugins {
 includeBuild("..")
 dependencyResolutionManagement { repositories { google(); mavenCentral() } }
 rootProject.name = "apparmorx-sample"
+include(":provider-fixture")

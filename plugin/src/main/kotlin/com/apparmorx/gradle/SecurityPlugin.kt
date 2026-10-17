@@ -66,8 +66,8 @@ class SecurityPlugin : Plugin<Project> {
                 }
                 variant.sources.assets?.addGeneratedSourceDirectory(task, PrepareSecurityPolicy::outputDirectory)
                 variant.instrumentation.apply {
-                    // Lifecycle guards remain scoped to app components. The separate ALL pass covers supported
-                    // calls in external JAR/AAR dependencies without synthesizing their lifecycle methods.
+                    // Lifecycle guards remain PROJECT scoped. ALL covers supported firewall calls and
+                    // concrete provider-operation bodies in dependencies, without synthesizing overrides.
                     transformClassesWith(GuardClassVisitorFactory::class.java, InstrumentationScope.PROJECT) {}
                     transformClassesWith(DependencyFirewallClassVisitorFactory::class.java, InstrumentationScope.ALL) {}
                     setAsmFramesComputationMode(FramesComputationMode.COMPUTE_FRAMES_FOR_INSTRUMENTED_METHODS)
@@ -85,6 +85,16 @@ class SecurityPlugin : Plugin<Project> {
                     htmlReportFile.set(project.layout.buildDirectory.file("reports/apparmorx/protection-report-${variant.name}.html"))
                     sarifReportFile.set(project.layout.buildDirectory.file("reports/apparmorx/security-audit-${variant.name}.sarif"))
                 }
+                val bundleCoverage = project.tasks.register("verify${name}BundleProtectionCoverage", VerifyBundleProtectionCoverage::class.java) {
+                    group = "verification"
+                    description = "Audit the final signed AppArmorX Android App Bundle"
+                    mergedManifest.set(variant.artifacts.get(SingleArtifact.MERGED_MANIFEST))
+                    debuggable.set(isVariantDebuggable)
+                    reportFile.set(project.layout.buildDirectory.file("reports/apparmorx/protection-report-${variant.name}-bundle.json"))
+                }
+                variant.artifacts.use(bundleCoverage)
+                    .wiredWithFiles(VerifyBundleProtectionCoverage::inputBundle, VerifyBundleProtectionCoverage::outputBundle)
+                    .toTransform(SingleArtifact.BUNDLE)
                 // AGP has not necessarily created the "assemble<Variant>" lifecycle task yet at this
                 // point, so `tasks.named(...)` would fail eagerly; `matching` tolerates either order.
                 project.tasks.matching { it.name == "assemble$name" }.configureEach { dependsOn(coverage) }
@@ -110,7 +120,8 @@ private fun recordSettings(
     val d = profileDefaults(extension, debuggable)
     fun both(key: String, explicit: Provider<String>) {
         defaults.put(key, d.map { it.asMap().getValue(key) })
-        effective.put(key, explicit.orElse(d.map { it.asMap().getValue(key) }))
+        val configured = explicit.orElse(d.map { it.asMap().getValue(key) })
+        effective.put(key, configured.map { debugSafeSetting(key, it, debuggable) })
     }
     both("restrictedAction", extension.restrictedAction)
     both("enforceIndeterminate", extension.enforceIndeterminate.map { it.toString() })
@@ -151,4 +162,11 @@ private fun PrepareSecurityPolicy.configurePolicy(extension: SecurityExtension, 
     antiPtraceHardening.set(extension.antiPtraceHardening.orElse(defaults.map { it.antiPtraceHardening }))
     killOnConfirmedHooking.set(extension.killOnConfirmedHooking.orElse(defaults.map { it.killOnConfirmedHooking }))
     payloadDigests.set(extension.payloadDigests)
+    // Explicit DSL values must not override the debug safety contract.
+    if (debuggable) {
+        restrictedAction.set("OBSERVE")
+        failClosedOnStartup.set(false)
+        antiPtraceHardening.set(false)
+        killOnConfirmedHooking.set(false)
+    }
 }

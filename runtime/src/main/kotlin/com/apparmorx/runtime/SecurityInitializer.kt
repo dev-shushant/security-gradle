@@ -8,8 +8,9 @@ import android.os.Bundle
 
 /**
  * Non-exported, multiprocess lifecycle initializer.
- * Automatically initializes AppArmorX across all application processes (main, :auth, :sandbox).
- * Supports inter-process posture queries via [call] without external IPC overhead.
+ * Initializes the process in which Android creates this provider. With multiprocess=true,
+ * a query may reach a local clone rather than the primary process. Guarded entries also
+ * initialize their own process. Diagnostics from [call] never authorize another process.
  *
  * Authored by Shushant Tiwari • com.apparmorx
  */
@@ -23,11 +24,19 @@ class SecurityInitializer : ContentProvider() {
         return when (method) {
             "getSecurityState" -> {
                 val snapshot = SecurityRuntime.snapshot()
+                val posture = processPosture(snapshot, SecurityGuard.lastObservedState(), System.currentTimeMillis())
                 Bundle().apply {
                     putLong("sequence", snapshot.policySequence)
                     putLong("checkedAtMillis", snapshot.checkedAtMillis)
                     putBoolean("isMirageActive", DeceptionEngine.isMirageActive)
-                    putString("state", SecurityGuard.lastObservedState().name)
+                    // Preserve the legacy last-guard field; fresh evidence is explicitly separate.
+                    putString("state", posture.lastObservedState.name)
+                    putString("stateSource", "last-guard")
+                    putString("evidenceState", posture.evidenceState.name)
+                    putString("scope", "responding-process")
+                    putInt("responderPid", android.os.Process.myPid())
+                    putInt("responderUid", android.os.Process.myUid())
+                    putString("responderProcess", android.app.Application.getProcessName() ?: "unknown")
                 }
             }
             else -> null

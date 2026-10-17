@@ -137,10 +137,11 @@ internal fun shouldKillOnConfirmedHooking(
  * CHECKING escalates to restrictedAction only when [EnforcementPolicy.failClosedOnStartup] is explicitly opted in;
  * otherwise it is OBSERVE. READY is always OBSERVE.
  */
-internal fun resolveEnforcementAction(state: ProtectionState, policy: EnforcementPolicy): EnforcementAction = when {
+internal fun resolveEnforcementAction(state: ProtectionState, policy: EnforcementPolicy, debuggable: Boolean = false, startupGateApplies: Boolean = true): EnforcementAction = when {
+    debuggable -> EnforcementAction.OBSERVE
     state == ProtectionState.RESTRICTED -> policy.restrictedAction
     state == ProtectionState.INDETERMINATE && policy.enforceIndeterminate -> policy.restrictedAction
-    state == ProtectionState.CHECKING && policy.failClosedOnStartup -> policy.restrictedAction
+    state == ProtectionState.CHECKING && startupGateApplies && policy.failClosedOnStartup -> policy.restrictedAction
     else -> EnforcementAction.OBSERVE
 }
 
@@ -194,25 +195,31 @@ internal fun isVirtualSpacePath(filesDirPath: String, packageName: String): Bool
     return suspiciousContainers.any { filesDirPath.contains(it) }
 }
 
-internal fun isEmulatorFingerprint(
+/** Ambiguous build labels are evidence gaps, not a confirmed virtual environment. */
+internal fun emulatorFingerprintStatus(
     fingerprint: String,
     model: String,
     brand: String,
     device: String,
     product: String,
-    hardware: String
-): Boolean {
-    return fingerprint.startsWith("generic") ||
-        fingerprint.startsWith("unknown") ||
-        model.contains("google_sdk") ||
-        model.contains("Emulator") ||
-        model.contains("Android SDK built for x86") ||
-        (brand.startsWith("generic") && device.startsWith("generic")) ||
-        product.contains("sdk_gphone") ||
-        product.contains("sdk_google") ||
-        product.contains("vbox86p") ||
-        product.contains("emulator") ||
-        hardware.contains("goldfish") ||
-        hardware.contains("ranchu")
+    hardware: String,
+): Status {
+    val fp = fingerprint.lowercase()
+    val modelName = model.lowercase()
+    val productName = product.lowercase()
+    val hardwareName = hardware.lowercase()
+    val knownHardware = hardwareName in setOf("ranchu", "goldfish", "vbox86", "vbox86p")
+    val knownProduct = listOf("sdk_gphone", "sdk_google", "vbox86p").any { productName.startsWith(it) }
+    if (knownHardware || knownProduct) return Status.DETECTED
+    val ambiguous = listOf(fingerprint, model, brand, device, product, hardware).any { it.isBlank() } ||
+        fp.startsWith("unknown") || fp.startsWith("generic") ||
+        (brand.lowercase().startsWith("generic") && device.lowercase().startsWith("generic")) ||
+        modelName.contains("emulator") || modelName.contains("google_sdk") ||
+        modelName.contains("android sdk built for") || productName.contains("emulator")
+    return if (ambiguous) Status.UNAVAILABLE else Status.CLEAR
 }
+
+internal fun isEmulatorFingerprint(
+    fingerprint: String, model: String, brand: String, device: String, product: String, hardware: String,
+): Boolean = emulatorFingerprintStatus(fingerprint, model, brand, device, product, hardware) == Status.DETECTED
 

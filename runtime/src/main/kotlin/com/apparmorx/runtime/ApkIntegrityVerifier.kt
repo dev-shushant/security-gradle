@@ -8,11 +8,9 @@ import java.util.zip.Adler32
 import java.util.zip.ZipFile
 
 /**
- * Enterprise Cryptographic Payload & DEX Integrity Verifier.
- *
- * Performs deep structural parsing, Dalvik/ART header validation,
- * checksum & signature verification, anti-repackaging artifact inspection,
- * and cryptographic entry digest verification over the host package archive (APK).
+ * APK structure, DEX header self-consistency and optional independently trusted entry digests.
+ * DEX SHA-1/Adler-32 fields are self-checks, not APK signer authentication. Signer and policy
+ * trust are checked separately; structural success alone is not repackaging resistance.
  */
 internal object ApkIntegrityVerifier {
 
@@ -45,7 +43,10 @@ internal object ApkIntegrityVerifier {
         return try {
             ZipFile(apkFile).use { zip ->
                 val entries = zip.entries().asSequence().toList()
-                val entryNames = entries.map { it.name }.toSet()
+                val entryNames = mutableSetOf<String>()
+                for (entry in entries) {
+                    if (!entryNames.add(entry.name) && !entry.isDirectory) return false
+                }
 
                 // 1. Mandatory base entries
                 if ("classes.dex" !in entryNames) return false
